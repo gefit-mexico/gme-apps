@@ -608,7 +608,7 @@ async function generarAnticipo(){
   document.getElementById("res-proy").textContent  = proy;
   document.getElementById("res-monto").textContent = fmtMXN(monto);
 
-  const params = new URLSearchParams({id, empid:emp.id, empleado:emp.nombre, email:emp.email, proyecto:proy, monto, fecha});
+  const params = new URLSearchParams({id, empid:emp.id, empleado:emp.nombre, email:emp.email, proyecto:proy, monto, fecha, v:"2"});
   const link = `${FORM_DIPENDENTE}?${params.toString()}`;
   document.getElementById("link-preview").textContent = link;
   document.getElementById("resultado").style.display = "block";
