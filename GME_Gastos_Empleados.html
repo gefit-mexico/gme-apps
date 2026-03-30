@@ -419,19 +419,30 @@ const ANTICIPO = {
 };
 
 // ── INIT ─────────────────────────────────────────────────────────────────────
-document.getElementById('hdr-fecha').textContent = new Date().toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'});
-document.getElementById('chip-empleado').textContent = ANTICIPO.empleado;
-document.getElementById('chip-proyecto').textContent = ANTICIPO.proyecto;
-document.getElementById('chip-monto').textContent    = fmtMXN(ANTICIPO.monto);
-document.getElementById('chip-id').textContent       = ANTICIPO.id;
-document.getElementById('firma-nombre').value        = ANTICIPO.empleado !== '—' ? ANTICIPO.empleado : '';
-document.getElementById('firma-fecha').value         = new Date().toISOString().split('T')[0];
-document.getElementById('sum-anticipo').textContent  = fmtMXN(ANTICIPO.monto);
+function initForm(){
+  // Rileggi i params al momento del load per sicurezza
+  const p = new URLSearchParams(window.location.search);
+  if(p.get('id'))       ANTICIPO.id       = p.get('id');
+  if(p.get('empleado')) ANTICIPO.empleado = decodeURIComponent(p.get('empleado'));
+  if(p.get('email'))    ANTICIPO.email    = p.get('email');
+  if(p.get('proyecto')) ANTICIPO.proyecto = decodeURIComponent(p.get('proyecto'));
+  if(p.get('monto'))    ANTICIPO.monto    = parseFloat(p.get('monto'));
+  if(p.get('fecha'))    ANTICIPO.fecha    = p.get('fecha');
 
-// Límite 15 días hábiles
-const lim = new Date(); let dias=0;
-while(dias<15){lim.setDate(lim.getDate()+1);const d=lim.getDay();if(d!==0&&d!==6)dias++;}
-document.getElementById('chip-limite').textContent = lim.toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'});
+  document.getElementById('hdr-fecha').textContent = new Date().toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'});
+  document.getElementById('chip-empleado').textContent = ANTICIPO.empleado;
+  document.getElementById('chip-proyecto').textContent = ANTICIPO.proyecto;
+  document.getElementById('chip-monto').textContent    = fmtMXN(ANTICIPO.monto);
+  document.getElementById('chip-id').textContent       = ANTICIPO.id;
+  document.getElementById('firma-nombre').value        = ANTICIPO.empleado !== '—' ? ANTICIPO.empleado : '';
+  document.getElementById('firma-fecha').value         = new Date().toISOString().split('T')[0];
+  document.getElementById('sum-anticipo').textContent  = fmtMXN(ANTICIPO.monto);
+
+  // Límite 15 días hábiles
+  const lim = new Date(); let dias=0;
+  while(dias<15){lim.setDate(lim.getDate()+1);const d=lim.getDay();if(d!==0&&d!==6)dias++;}
+  document.getElementById('chip-limite').textContent = lim.toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'});
+}
 
 // ── CATEGORÍAS ────────────────────────────────────────────────────────────────
 const CATS = {
@@ -723,7 +734,7 @@ function exportarResumen(){
 }
 
 // Auto-open primera sección
-window.onload = () => { addRow('rest'); toggleSection('rest'); };
+window.onload = () => { initForm(); addRow('rest'); toggleSection('rest'); };
 </script>
 </body>
 </html>
