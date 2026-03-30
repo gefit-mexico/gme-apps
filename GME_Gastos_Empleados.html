@@ -645,7 +645,7 @@ async function enviarJustificacion(){
         Firma:              d.firma,
         FechaEnvio:         new Date().toISOString()
       };
-      const r = await fetch(SP_URL+'/_api/lists/getbytitle('GME_Justificaciones')/items',{
+      const r = await fetch(SP_URL+"/_api/lists/getbytitle('GME_Justificaciones')/items",{
         method:'POST',
         headers:{
           'Accept':'application/json;odata=nometadata',
