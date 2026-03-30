@@ -574,6 +574,12 @@ async function generarAnticipo(){
   const btnGen = document.querySelector('[onclick="generarAnticipo()"]');
   if(btnGen){ btnGen.disabled=true; btnGen.textContent="⏳ Guardando..."; }
 
+  const ant = {_spId:null, id, empId:emp.id, empleado:emp.nombre, email:emp.email,
+                proyecto:proy, monto, fecha, destino:dest, notas,
+                estadoAdmin:"Pendiente", nota_admin:"", fechaEmision:now.toISOString(), justificacion:null};
+
+  // Intenta guardar en SharePoint
+  let spOk = false;
   try {
     const item = await spPost(LIST_ANTICIPOS, {
       Title:        id,
@@ -588,27 +594,27 @@ async function generarAnticipo(){
       EstadoAdmin:  "Pendiente",
       FechaEmision: now.toISOString()
     });
-
-    const ant = {_spId:item.Id, id, empId:emp.id, empleado:emp.nombre, email:emp.email,
-                  proyecto:proy, monto, fecha, destino:dest, notas,
-                  estadoAdmin:"Pendiente", nota_admin:"", fechaEmision:now.toISOString(), justificacion:null};
-    anticipos.unshift(ant);
-
-    document.getElementById("res-id").textContent    = id;
-    document.getElementById("res-emp").textContent   = emp.nombre;
-    document.getElementById("res-proy").textContent  = proy;
-    document.getElementById("res-monto").textContent = fmtMXN(monto);
-
-    const params = new URLSearchParams({id, empid:emp.id, empleado:emp.nombre, email:emp.email, proyecto:proy, monto, fecha});
-    const link = `${FORM_DIPENDENTE}?${params.toString()}`;
-    document.getElementById("link-preview").textContent = link;
-    document.getElementById("resultado").style.display = "block";
-    renderStats(); renderTabla(); renderPendientes(); renderReporte();
-    toast("✅ Anticipo "+id+" guardado en SharePoint");
+    if(item && item.Id){ ant._spId = item.Id; spOk = true; }
   } catch(e){
-    toast("❌ Error guardando: "+e.message);
-    console.error(e);
+    console.warn("SharePoint no disponible, guardando local:", e.message);
   }
+
+  // Siempre guarda local como respaldo
+  anticipos.unshift(ant);
+  localStorage.setItem("gme_anticipos", JSON.stringify(anticipos));
+
+  document.getElementById("res-id").textContent    = id;
+  document.getElementById("res-emp").textContent   = emp.nombre;
+  document.getElementById("res-proy").textContent  = proy;
+  document.getElementById("res-monto").textContent = fmtMXN(monto);
+
+  const params = new URLSearchParams({id, empid:emp.id, empleado:emp.nombre, email:emp.email, proyecto:proy, monto, fecha});
+  const link = `${FORM_DIPENDENTE}?${params.toString()}`;
+  document.getElementById("link-preview").textContent = link;
+  document.getElementById("resultado").style.display = "block";
+  renderStats(); renderTabla(); renderPendientes(); renderReporte();
+  toast(spOk ? "✅ Anticipo "+id+" guardado en SharePoint" : "📦 Anticipo "+id+" guardado localmente");
+
   if(btnGen){ btnGen.disabled=false; btnGen.innerHTML="✅ Generar anticipo y link"; }
 }
 
