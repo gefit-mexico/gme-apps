@@ -518,7 +518,21 @@ function recalc(){
       catTotal += monto;
       catCount++;
       totalGastado += monto;
-      if(tipo==='Factura') totalFactura += monto;
+      // Factura conta solo se ha un file allegato
+      const fileInput = tr.querySelector('.f-file');
+      const hasFile = fileInput && fileInput.files && fileInput.files.length > 0;
+      if(tipo==='Factura' && hasFile) totalFactura += monto;
+      // Evidenzia visivamente le fatture senza file
+      const fileBtn = tr.querySelector('.file-btn');
+      if(fileBtn){
+        if(tipo==='Factura' && !hasFile && monto>0){
+          fileBtn.style.borderColor='#d63c3c';
+          fileBtn.title='Adjunta el XML o PDF de la factura';
+        } else {
+          fileBtn.style.borderColor='';
+          fileBtn.title='';
+        }
+      }
     });
     document.getElementById(cat+'-total').textContent =
       CATS[cat].label + ' — '+fmtMXN(catTotal);
@@ -543,10 +557,21 @@ function recalc(){
   fill.style.background = pct>=70?'var(--green)':pct>=40?'var(--orange)':'var(--red)';
   document.getElementById('prog-label').textContent =
     pct+'% — '+(pct>=70?'✅ Requisito cumplido':'⚠️ Mínimo requerido: 70%');
+  // Conta fatture senza file
+  let factSinFile = 0;
+  document.querySelectorAll('.expense-row').forEach(tr=>{
+    const tipo = tr.querySelector('.f-tipo').value;
+    const monto = parseFloat(tr.querySelector('.f-monto').value)||0;
+    const fi = tr.querySelector('.f-file');
+    if(tipo==='Factura' && monto>0 && !(fi && fi.files && fi.files.length>0)) factSinFile++;
+  });
+  const noteExtra = factSinFile>0 ? ' ⚠️ '+factSinFile+' factura(s) sin archivo adjunto — no cuentan para el porcentaje.' : '';
   document.getElementById('prog-note').textContent =
-    pct>=70
+    pct>=70 && factSinFile===0
       ? 'Excelente. El respaldo con facturas es suficiente para procesar la justificación.'
-      : 'Faltan '+(70-pct)+'% para alcanzar el mínimo. Agrega más gastos con tipo "Factura".';
+      : factSinFile>0
+        ? 'Adjunta el PDF o XML de cada factura para que cuente en el porcentaje.'+noteExtra
+        : 'Faltan '+(70-pct)+'% para alcanzar el mínimo. Agrega más gastos con tipo "Factura" y adjunta el comprobante.';
 
   const alertBar = document.getElementById('alert-bar');
   if(pct>=70){
