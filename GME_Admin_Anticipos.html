@@ -184,6 +184,7 @@ body{font-family:"DM Sans",sans-serif;background:#eef3f8;color:var(--gray);min-h
   <div class="tab" onclick="switchTab('lista')" id="tab-lista">📋 Justificaciones <span class="tab-count" id="tc-total">0</span></div>
   <div class="tab" onclick="switchTab('pendientes')" id="tab-pend">⏳ Pendientes <span class="tab-count red" id="tc-pend">0</span></div>
   <div class="tab" onclick="switchTab('reporte')">📊 Reporte</div>
+  <div class="tab" onclick="switchTab('historico')">📂 Carga Histórica</div>
 </div>
 
 <div class="main">
@@ -338,6 +339,69 @@ body{font-family:"DM Sans",sans-serif;background:#eef3f8;color:var(--gray);min-h
         <button class="btn btn-primary" onclick="exportarReporteHTML()">📄 Exportar HTML</button>
         <button class="btn btn-sec" onclick="exportarReporteCSV()">📊 Exportar CSV</button>
       </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══ TAB: CARGA HISTÓRICA ═══ -->
+<div class="tab-panel" id="panel-historico">
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">📂 Carga de anticipos históricos</div>
+      <div style="font-size:12px;color:#aaa">Registra anticipos pasados uno por dipendente</div>
+    </div>
+    <div class="card-body">
+
+      <div class="form-group" style="margin-bottom:20px">
+        <label>Seleccionar empleado</label>
+        <div class="emp-grid" id="hist-emp-grid"></div>
+      </div>
+
+      <div class="form-group" style="margin-bottom:16px">
+        <label>Proyecto / Código (aplica a todos los registros)</label>
+        <input type="text" id="hist-proyecto" placeholder="Ej. Dalian D0397, Brembo MTY..." list="proyectos-list-h">
+        <datalist id="proyectos-list-h">
+          <option value="Dalian D0395"><option value="Dalian D0396"><option value="Dalian D0397"><option value="Dalian D0398">
+          <option value="Brembo México"><option value="Marelli Toluca"><option value="Pierburg Pump Tech MX">
+          <option value="Piovan Food & Powers"><option value="Actividad Interna">
+        </datalist>
+      </div>
+
+      <div style="margin-bottom:12px;display:flex;align-items:center;justify-content:space-between">
+        <div style="font-size:13px;font-weight:600;color:var(--gray-d)">Anticipos a registrar</div>
+        <button class="btn btn-sec" style="padding:7px 14px;font-size:13px" onclick="histAddRow()">+ Agregar fila</button>
+      </div>
+
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:separate;border-spacing:0 6px" id="hist-tabla">
+          <thead>
+            <tr>
+              <th style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#aaa;padding:6px 10px;text-align:left;font-weight:500">Fecha anticipo</th>
+              <th style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#aaa;padding:6px 10px;text-align:left;font-weight:500">Monto (MXN)</th>
+              <th style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#aaa;padding:6px 10px;text-align:left;font-weight:500">Destino</th>
+              <th style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#aaa;padding:6px 10px;text-align:left;font-weight:500">Notas</th>
+              <th style="width:40px"></th>
+            </tr>
+          </thead>
+          <tbody id="hist-rows"></tbody>
+        </table>
+      </div>
+
+      <div style="margin-top:12px;padding:10px 14px;background:var(--blue-xl);border-radius:8px;font-size:12px;color:var(--blue-d)" id="hist-resumen" style="display:none">
+        <span id="hist-resumen-txt"></span>
+      </div>
+
+      <div class="btn-row" style="margin-top:20px">
+        <button class="btn btn-primary" onclick="histGuardarTodo()">✅ Guardar todos los anticipos</button>
+        <button class="btn btn-sec" onclick="histLimpiar()">🔄 Limpiar</button>
+      </div>
+
+      <div id="hist-resultado" style="display:none;margin-top:20px;padding:16px;background:var(--green-l);border:1.5px solid #a8e6c4;border-radius:var(--radius-sm)">
+        <div style="font-weight:700;color:var(--green);margin-bottom:6px" id="hist-resultado-titulo"></div>
+        <div style="font-size:12px;color:var(--gray)" id="hist-resultado-detalle"></div>
+      </div>
+
     </div>
   </div>
 </div>
@@ -871,6 +935,147 @@ function switchTab(name){
   if(name==="lista") renderTabla();
   if(name==="pendientes") renderPendientes();
   if(name==="reporte") renderReporte();
+  if(name==="historico") renderHistEmpGrid();
+}
+
+
+// ── CARGA HISTÓRICA ───────────────────────────────────────────────────────────
+let histSelectedEmpId = null;
+let histRowCounter = 0;
+
+function renderHistEmpGrid(){
+  const g = document.getElementById("hist-emp-grid");
+  if(!g) return;
+  g.innerHTML = EMPLEADOS.map(e=>`
+    <div class="emp-card ${histSelectedEmpId===e.id?"selected":""}" onclick="histSelectEmp(${e.id})" id="hec-${e.id}">
+      <div class="emp-avatar">${initials(e.nombre)}</div>
+      <div><div class="emp-name">${e.nombre.split(" ")[0]} ${e.nombre.split(" ").slice(-1)[0]}</div><div class="emp-rol">${e.rol}</div></div>
+    </div>`).join("");
+}
+
+function histSelectEmp(id){
+  histSelectedEmpId = id;
+  document.querySelectorAll("[id^='hec-']").forEach(c=>c.classList.remove("selected"));
+  document.getElementById("hec-"+id)?.classList.add("selected");
+  histUpdateResumen();
+}
+
+function histAddRow(){
+  const tbody = document.getElementById("hist-rows");
+  const rid = ++histRowCounter;
+  const today = new Date().toISOString().split("T")[0];
+  const tr = document.createElement("tr");
+  tr.dataset.rid = rid;
+  tr.innerHTML = `
+    <td style="padding:4px 6px">
+      <input type="date" value="${today}" style="padding:8px 10px;border:1.5px solid var(--gray-m);border-radius:8px;font-size:13px;width:150px;font-family:DM Sans,sans-serif" class="h-fecha">
+    </td>
+    <td style="padding:4px 6px">
+      <input type="number" placeholder="3500" min="0" step="100" style="padding:8px 10px;border:1.5px solid var(--gray-m);border-radius:8px;font-size:13px;width:110px;font-family:DM Sans,sans-serif;text-align:right" class="h-monto" oninput="histUpdateResumen()">
+    </td>
+    <td style="padding:4px 6px">
+      <input type="text" placeholder="Saltillo, CDMX..." style="padding:8px 10px;border:1.5px solid var(--gray-m);border-radius:8px;font-size:13px;width:160px;font-family:DM Sans,sans-serif" class="h-destino">
+    </td>
+    <td style="padding:4px 6px">
+      <input type="text" placeholder="Opcional..." style="padding:8px 10px;border:1.5px solid var(--gray-m);border-radius:8px;font-size:13px;width:180px;font-family:DM Sans,sans-serif" class="h-notas">
+    </td>
+    <td style="padding:4px 6px">
+      <button onclick="this.closest('tr').remove();histUpdateResumen()" style="background:var(--red-l);border:none;color:var(--red);border-radius:6px;padding:6px 10px;cursor:pointer;font-size:13px">✕</button>
+    </td>`;
+  tbody.appendChild(tr);
+  histUpdateResumen();
+}
+
+function histUpdateResumen(){
+  const rows = document.querySelectorAll("#hist-rows tr");
+  let total = 0;
+  rows.forEach(tr=>{ total += parseFloat(tr.querySelector(".h-monto")?.value||0); });
+  const el = document.getElementById("hist-resumen");
+  const txt = document.getElementById("hist-resumen-txt");
+  if(rows.length>0){
+    el.style.display="block";
+    const emp = histSelectedEmpId ? EMPLEADOS.find(e=>e.id===histSelectedEmpId)?.nombre : "—";
+    txt.textContent = rows.length+" anticipo(s) · "+emp+" · Total: "+fmtMXN(total);
+  } else { el.style.display="none"; }
+}
+
+async function histGuardarTodo(){
+  if(!histSelectedEmpId){ toast("⚠️ Selecciona un empleado"); return; }
+  const proy = document.getElementById("hist-proyecto").value.trim();
+  if(!proy){ toast("⚠️ Ingresa el proyecto"); return; }
+  const rows = document.querySelectorAll("#hist-rows tr");
+  if(!rows.length){ toast("⚠️ Agrega al menos una fila"); return; }
+
+  const emp = EMPLEADOS.find(e=>e.id===histSelectedEmpId);
+  const now = new Date();
+  const errores = [];
+  const generados = [];
+
+  const btn = document.querySelector('[onclick="histGuardarTodo()"]');
+  if(btn){ btn.disabled=true; btn.textContent="⏳ Guardando..."; }
+
+  for(const tr of rows){
+    const fecha  = tr.querySelector(".h-fecha").value;
+    const monto  = parseFloat(tr.querySelector(".h-monto").value)||0;
+    const dest   = tr.querySelector(".h-destino").value.trim();
+    const notas  = tr.querySelector(".h-notas").value.trim();
+    if(!fecha||!monto){ errores.push("Fila sin fecha o monto"); continue; }
+
+    const yy = fecha.slice(2,4);
+    const mm = fecha.slice(5,7);
+    const seq = String(anticipos.filter(a=>a.id.startsWith("ANT-"+yy)).length + generados.length + 1).padStart(3,"0");
+    const id  = `ANT-${yy}${mm}-${seq}`;
+
+    const ant = {_spId:null, id, empId:emp.id, empleado:emp.nombre, email:emp.email,
+                  proyecto:proy, monto, fecha, destino:dest, notas,
+                  estadoAdmin:"Pendiente", nota_admin:"",
+                  fechaEmision: new Date(fecha).toISOString(), justificacion:null};
+
+    // Intenta guardar en SharePoint
+    try {
+      const item = await spPost(LIST_ANTICIPOS, {
+        Title:        id,
+        Empleado:     emp.nombre,
+        EmpleadoID:   emp.id,
+        Email:        emp.email,
+        Proyecto:     proy,
+        Monto:        monto,
+        Fecha:        fecha,
+        Destino:      dest,
+        Notas:        notas,
+        EstadoAdmin:  "Pendiente",
+        FechaEmision: new Date(fecha).toISOString()
+      });
+      if(item && item.Id) ant._spId = item.Id;
+    } catch(e){ console.warn("SP no disponible:", e.message); }
+
+    anticipos.unshift(ant);
+    generados.push(id);
+  }
+
+  localStorage.setItem("gme_anticipos", JSON.stringify(anticipos));
+  renderStats(); renderTabla(); renderPendientes(); renderReporte();
+
+  if(btn){ btn.disabled=false; btn.innerHTML="✅ Guardar todos los anticipos"; }
+
+  const res = document.getElementById("hist-resultado");
+  res.style.display="block";
+  document.getElementById("hist-resultado-titulo").textContent =
+    "✅ "+generados.length+" anticipo(s) registrados para "+emp.nombre;
+  document.getElementById("hist-resultado-detalle").textContent =
+    "IDs: "+generados.join(", ")+(errores.length?" | ⚠️ "+errores.length+" fila(s) omitidas":"");
+
+  toast("✅ "+generados.length+" anticipos guardados");
+}
+
+function histLimpiar(){
+  histSelectedEmpId=null;
+  renderHistEmpGrid();
+  document.getElementById("hist-rows").innerHTML="";
+  document.getElementById("hist-proyecto").value="";
+  document.getElementById("hist-resultado").style.display="none";
+  document.getElementById("hist-resumen").style.display="none";
+  histRowCounter=0;
 }
 
 // ── INIT ───────────────────────────────────────────────────────────────────────
@@ -879,6 +1084,7 @@ document.getElementById("ant-fecha").value = new Date().toISOString().split("T")
 
 window.addEventListener("load",()=>{
   renderEmpGrid();
+  renderHistEmpGrid();
   populateRptEmp();
   cargarDatos();
   document.getElementById("rpt-anio")?.addEventListener("change",renderReporte);
