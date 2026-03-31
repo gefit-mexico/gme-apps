@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>GEFIT Mexico — Panel Administrativo · Anticipos</title>
+<script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -176,6 +177,16 @@ body{font-family:"DM Sans",sans-serif;background:#eef3f8;color:var(--gray);min-h
     <span class="hero-badge">ADMIN</span>
   </div>
   <div class="hero-sub">GEFIT Mexico Engineering S.A. de C.V. &nbsp;·&nbsp; José Oscar Gullino</div>
+</div>
+
+<!-- MSAL LOGIN BAR -->
+<div id="msal-status" style="display:none;background:#eafaf1;border-bottom:1px solid #a8e6c4;padding:8px 32px;font-size:12px;color:#22a05a;align-items:center;gap:12px">
+  <span>✅ Conectado como: <strong id="msal-user"></strong></span>
+  <button onclick="msalLogout()" style="background:none;border:1px solid #22a05a;color:#22a05a;border-radius:6px;padding:3px 10px;cursor:pointer;font-size:11px">Cerrar sesión</button>
+</div>
+<div id="msal-login-bar" style="display:none;background:#fef4ea;border-bottom:1px solid #f5d0a0;padding:10px 32px;display:flex;align-items:center;gap:16px">
+  <span style="font-size:13px;color:#e07b20">⚠️ Inicia sesión con tu cuenta Microsoft para guardar en SharePoint</span>
+  <button id="msal-login-btn" onclick="msalLogin()" class="btn btn-primary" style="padding:8px 18px;font-size:13px">🔐 Iniciar sesión</button>
 </div>
 
 <!-- TABS -->
@@ -436,6 +447,48 @@ const LIST_ANTICIPOS      = "GME_Anticipos";
 const LIST_JUSTIFICACIONES= "GME_Justificaciones";
 const FORM_DIPENDENTE     = "https://gefit-mexico.github.io/gme-apps/GME_Gastos_Empleados.html";
 
+// ── MSAL CONFIG ───────────────────────────────────────────────────────────────
+const msalConfig = {
+  auth: {
+    clientId: "1581f9ad-82e6-494e-810b-f8c18271ce4c",
+    authority: "https://login.microsoftonline.com/5e9917fe-df22-4e96-a361-9e14199c0a13",
+    redirectUri: "https://gefit-mexico.github.io/gme-apps/GME_Admin_Anticipos.html"
+  },
+  cache: { cacheLocation: "sessionStorage" }
+};
+const msalInstance = new msal.PublicClientApplication(msalConfig);
+const SP_SCOPES = ["https://gefit.sharepoint.com/AllSites.Write"];
+let msalToken = null;
+
+async function getToken(){
+  if(msalToken) return msalToken;
+  const accounts = msalInstance.getAllAccounts();
+  if(accounts.length > 0){
+    try {
+      const r = await msalInstance.acquireTokenSilent({scopes:SP_SCOPES, account:accounts[0]});
+      msalToken = r.accessToken; return msalToken;
+    } catch(e){}
+  }
+  try {
+    const r = await msalInstance.acquireTokenPopup({scopes:SP_SCOPES});
+    msalToken = r.accessToken; return msalToken;
+  } catch(e){ toast("❌ Error de autenticación: "+e.message); return null; }
+}
+
+async function msalInit(){
+  await msalInstance.initialize();
+  // Gestisci redirect
+  try { await msalInstance.handleRedirectPromise(); } catch(e){}
+  const accounts = msalInstance.getAllAccounts();
+  if(accounts.length > 0){
+    document.getElementById("msal-user").textContent = accounts[0].username;
+    document.getElementById("msal-status").style.display = "flex";
+  } else {
+    // Mostra bottone login
+    document.getElementById("msal-login-btn").style.display = "inline-flex";
+  }
+}
+
 const EMPLEADOS = [
   {id:1,  nombre:"Jose Gullino",          email:"oscar.gullino@gefit.com.mx",      rol:"Business Development Manager", foto:""},
   {id:4,  nombre:"Gabino Chavira",        email:"gabino.chavira@gefit.com.mx",     rol:"Ensamblador Mecánico",         foto:""},
@@ -458,36 +511,32 @@ let digestExpiry = 0;
 // ── SHAREPOINT API ─────────────────────────────────────────────────────────────
 
 async function getDigest(){
-  if(spDigest && Date.now() < digestExpiry) return spDigest;
-  try {
-    const r = await fetch(`${SP_URL}/_api/contextinfo`, {
-      method:"POST",
-      headers:{"Accept":"application/json;odata=nometadata","Content-Length":"0"}
-    });
-    const d = await r.json();
-    spDigest = d.FormDigestValue;
-    digestExpiry = Date.now() + (d.FormDigestTimeoutSeconds - 30) * 1000;
-    return spDigest;
-  } catch(e){ toast("❌ Error de autenticación SharePoint"); return null; }
+  // Con MSAL usiamo Bearer token invece del digest
+  return await getToken();
 }
 
 async function spGet(lista, filtro=""){
+  const token = await getToken();
+  if(!token) throw new Error("No autenticado");
   const url = `${SP_URL}/_api/lists/getbytitle('${lista}')/items${filtro}`;
-  const r = await fetch(url, {headers:{"Accept":"application/json;odata=nometadata"}});
+  const r = await fetch(url, {headers:{
+    "Accept":"application/json;odata=nometadata",
+    "Authorization":"Bearer "+token
+  }});
   if(!r.ok) throw new Error("GET "+lista+" "+r.status);
   const d = await r.json();
   return d.value;
 }
 
 async function spPost(lista, datos){
-  const digest = await getDigest();
-  if(!digest) return null;
+  const token = await getToken();
+  if(!token) return null;
   const r = await fetch(`${SP_URL}/_api/lists/getbytitle('${lista}')/items`, {
     method:"POST",
     headers:{
       "Accept":"application/json;odata=nometadata",
       "Content-Type":"application/json;odata=nometadata",
-      "X-RequestDigest": digest
+      "Authorization":"Bearer "+token
     },
     body: JSON.stringify(datos)
   });
@@ -496,14 +545,14 @@ async function spPost(lista, datos){
 }
 
 async function spPatch(lista, itemId, datos){
-  const digest = await getDigest();
-  if(!digest) return;
+  const token = await getToken();
+  if(!token) return;
   const r = await fetch(`${SP_URL}/_api/lists/getbytitle('${lista}')/items(${itemId})`, {
     method:"POST",
     headers:{
       "Accept":"application/json;odata=nometadata",
       "Content-Type":"application/json;odata=nometadata",
-      "X-RequestDigest": digest,
+      "Authorization":"Bearer "+token,
       "X-HTTP-Method":"MERGE",
       "If-Match":"*"
     },
@@ -1079,10 +1128,29 @@ function histLimpiar(){
 }
 
 // ── INIT ───────────────────────────────────────────────────────────────────────
+async function msalLogin(){
+  try {
+    const r = await msalInstance.loginPopup({scopes:SP_SCOPES});
+    msalToken = r.accessToken;
+    document.getElementById("msal-user").textContent = r.account.username;
+    document.getElementById("msal-status").style.display = "flex";
+    document.getElementById("msal-login-bar").style.display = "none";
+    cargarDatos();
+  } catch(e){ toast("❌ Login fallido: "+e.message); }
+}
+
+function msalLogout(){
+  msalInstance.logoutPopup();
+  msalToken = null;
+  document.getElementById("msal-status").style.display = "none";
+  document.getElementById("msal-login-bar").style.display = "flex";
+}
+
 document.getElementById("hdr-fecha").textContent = new Date().toLocaleDateString("es-MX",{weekday:"long",day:"2-digit",month:"long",year:"numeric"});
 document.getElementById("ant-fecha").value = new Date().toISOString().split("T")[0];
 
-window.addEventListener("load",()=>{
+window.addEventListener("load",async ()=>{
+  await msalInit();
   renderEmpGrid();
   renderHistEmpGrid();
   populateRptEmp();
