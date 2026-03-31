@@ -756,26 +756,39 @@ async function confirmarAccion(){
   const {id,accion}=pendingAction;
   const nota=document.getElementById("modal-note").value.trim();
   const ant=anticipos.find(a=>a.id===id);
-  if(!ant||!ant._spId){ toast("❌ No se encontró el item en SharePoint"); cerrarModal(); return; }
-  try {
-    await spPatch(LIST_ANTICIPOS, ant._spId, {EstadoAdmin:accion, NotaAdmin:nota});
-    ant.estadoAdmin=accion; ant.nota_admin=nota;
-    cerrarModal();
-    renderStats(); renderTabla(); renderPendientes(); renderReporte();
-    toast(accion==="Aprobado"?"✅ Aprobado en SharePoint":"❌ Rechazado en SharePoint");
-  } catch(e){ toast("❌ Error: "+e.message); }
+  if(!ant){ cerrarModal(); return; }
+
+  // Intenta actualizar en SharePoint
+  let spOk = false;
+  if(ant._spId){
+    try {
+      await spPatch(LIST_ANTICIPOS, ant._spId, {EstadoAdmin:accion, NotaAdmin:nota});
+      spOk = true;
+    } catch(e){ console.warn("SharePoint no disponible:", e.message); }
+  }
+
+  // Siempre actualiza local
+  ant.estadoAdmin=accion; ant.nota_admin=nota;
+  localStorage.setItem("gme_anticipos", JSON.stringify(anticipos));
+  cerrarModal();
+  renderStats(); renderTabla(); renderPendientes(); renderReporte();
+  toast(spOk
+    ? (accion==="Aprobado"?"✅ Aprobado en SharePoint":"❌ Rechazado en SharePoint")
+    : (accion==="Aprobado"?"✅ Aprobado localmente":"❌ Rechazado localmente"));
 }
 
 async function resetEstado(id,evt){
   evt&&evt.stopPropagation();
   const ant=anticipos.find(a=>a.id===id);
-  if(!ant||!ant._spId) return;
-  try {
-    await spPatch(LIST_ANTICIPOS, ant._spId, {EstadoAdmin:"Pendiente",NotaAdmin:""});
-    ant.estadoAdmin="Pendiente"; ant.nota_admin="";
-    renderStats(); renderTabla(); renderPendientes();
-    toast("↩ Restablecido a Pendiente");
-  } catch(e){ toast("❌ Error: "+e.message); }
+  if(!ant) return;
+  if(ant._spId){
+    try { await spPatch(LIST_ANTICIPOS, ant._spId, {EstadoAdmin:"Pendiente",NotaAdmin:""}); }
+    catch(e){ console.warn("SharePoint no disponible:", e.message); }
+  }
+  ant.estadoAdmin="Pendiente"; ant.nota_admin="";
+  localStorage.setItem("gme_anticipos", JSON.stringify(anticipos));
+  renderStats(); renderTabla(); renderPendientes();
+  toast("↩ Restablecido a Pendiente");
 }
 
 function cerrarModal(){ document.getElementById("modal-approve").classList.remove("open"); pendingAction=null; }
