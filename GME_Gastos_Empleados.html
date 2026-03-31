@@ -483,7 +483,7 @@ function addRow(cat){
     <td>
       <label class="file-btn" id="fb-${rid}">
         📎 Adjuntar
-        <input type="file" class="file-input f-file" accept=".pdf,.jpg,.jpeg,.png,.heic" onchange="onFileChange(this,${rid})">
+        <input type="file" class="file-input f-file" accept=".pdf,.jpg,.jpeg,.png,.heic,.xml" onchange="onFileChange(this,${rid})">
       </label>
     </td>
     <td><button class="del-btn" onclick="delRow(this,'${cat}')">✕</button></td>
@@ -498,8 +498,21 @@ function addRow(cat){
 function onFileChange(input, rid){
   const btn = document.getElementById('fb-'+rid);
   if(input.files && input.files[0]){
+    const file = input.files[0];
+    const ext  = file.name.split('.').pop().toLowerCase();
+    const validExts = ['pdf','xml','jpg','jpeg','png','heic'];
+    // Controlla se la riga è tipo Factura
+    const row  = btn.closest('tr');
+    const tipo = row ? row.querySelector('.f-tipo').value : '';
+    if(tipo==='Factura' && !validExts.includes(ext)){
+      alert('Para Facturas solo se aceptan: PDF, XML, JPG, PNG.\nEl archivo "'+file.name+'" no es válido.');
+      input.value='';
+      return;
+    }
     btn.classList.add('has-file');
-    btn.childNodes[0].textContent = '✅ '+input.files[0].name.substring(0,12)+(input.files[0].name.length>12?'…':'');
+    btn.style.borderColor='';
+    const icon = ext==='xml'?'📄':ext==='pdf'?'📋':'🖼️';
+    btn.childNodes[0].textContent = icon+' '+file.name.substring(0,14)+(file.name.length>14?'…':'');
   }
 }
 
