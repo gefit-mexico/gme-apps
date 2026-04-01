@@ -172,6 +172,17 @@ body{font-family:'DM Sans',sans-serif;background:#eef3f8;color:var(--gray);min-h
   <span style="font-size:13px;color:#e07b20">⚠️ Inicia sesión para guardar en SharePoint</span>
   <button onclick="msalLogin()" style="background:#2494CA;border:none;color:#fff;border-radius:8px;padding:8px 16px;cursor:pointer;font-size:13px;font-weight:600">🔐 Iniciar sesión</button>
 </div>
+<div id="tipo-trasferta-bar" style="background:var(--white);border-bottom:2px solid var(--blue-mid);padding:14px 32px;display:flex;align-items:center;gap:20px;flex-wrap:wrap">
+  <span style="font-size:13px;font-weight:600;color:var(--gray-d)">🌍 Tipo de trasferta:</span>
+  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:500">
+    <input type="radio" name="tipo-trasferta" id="traf-nacional" value="Nacional" checked onchange="onTipoTrasfertaChange()" style="width:16px;height:16px;accent-color:var(--blue)">
+    🇲🇽 Nacional (requiere 70% con Facturas)
+  </label>
+  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:500">
+    <input type="radio" name="tipo-trasferta" id="traf-internacional" value="Internacional" onchange="onTipoTrasfertaChange()" style="width:16px;height:16px;accent-color:var(--blue)">
+    ✈️ Internacional (sin obligación de facturas)
+  </label>
+</div>
 <div class="alert info" id="alert-bar">
   ℹ️  Debes respaldar al menos el <strong>70%</strong> del total gastado con <strong>Facturas</strong>. Los Tickets y Notas de Remisión se aceptan para el resto.
 </div>
@@ -479,13 +490,20 @@ function addRow(cat){
   const tr = document.createElement('tr');
   tr.className = 'expense-row';
   tr.dataset.rid = rid;
+  const isNacional = document.getElementById('traf-nacional').checked;
   tr.innerHTML = `
     <td><input type="date" class="f-fecha" onchange="recalc()" value="${new Date().toISOString().split('T')[0]}"></td>
-    <td><input type="text" class="f-desc" placeholder="Descripción del gasto" onchange="recalc()"></td>
-    <td><select class="f-tipo" onchange="recalc()">
-      <option value="Factura">🧾 Factura</option>
-      <option value="Ticket">🎟 Ticket</option>
-      <option value="Nota">📄 Nota de Remisión</option>
+    <td style="min-width:160px">
+      <input type="text" class="f-desc" placeholder="Descripción del gasto" onchange="recalc()">
+      <div class="f-factura-fields" style="display:none;margin-top:4px;display:none">
+        <input type="text" class="f-serie" placeholder="Serie (ej. A)" style="width:70px;margin-right:4px;padding:5px 8px;border:1.5px solid var(--gray-m);border-radius:6px;font-size:12px;font-family:DM Sans,sans-serif">
+        <input type="text" class="f-numero" placeholder="Nº Factura" style="width:100px;padding:5px 8px;border:1.5px solid var(--gray-m);border-radius:6px;font-size:12px;font-family:DM Sans,sans-serif">
+      </div>
+    </td>
+    <td><select class="f-tipo" onchange="onTipoChange(this,${rid})">
+      ${isNacional ? '<option value="Factura">🧾 Factura</option>' : ''}
+      <option value="Foto ticket">📷 Foto ticket</option>
+      <option value="Propina">🤝 Propina</option>
       <option value="Sin comprobante">❌ Sin comprobante</option>
     </select></td>
     <td><input type="number" class="f-monto" placeholder="0.00" min="0" step="0.01" onchange="recalc()" oninput="recalc()"></td>
@@ -498,10 +516,80 @@ function addRow(cat){
     <td><button class="del-btn" onclick="delRow(this,'${cat}')">✕</button></td>
   `;
   tbody.appendChild(tr);
+  // Set initial state based on tipo
+  const tipoSel = tr.querySelector('.f-tipo');
+  onTipoChange(tipoSel, rid);
   // open section
   const body = document.getElementById(cat+'-body');
   if(!body.classList.contains('open')) toggleSection(cat);
   recalc();
+}
+
+function onTipoChange(sel, rid){
+  const row = sel.closest('tr');
+  const tipo = sel.value;
+  const facturaFields = row.querySelector('.f-factura-fields');
+  const fileBtn = document.getElementById('fb-'+rid);
+  // Show/hide Serie+Numero fields
+  if(facturaFields){
+    facturaFields.style.display = tipo==='Factura' ? 'block' : 'none';
+  }
+  // Update file button hint
+  if(fileBtn){
+    if(tipo==='Factura'){
+      fileBtn.childNodes[0].textContent = '📋 PDF/XML';
+      fileBtn.title = 'Adjunta PDF o XML de la factura';
+    } else if(tipo==='Foto ticket' || tipo==='Propina'){
+      fileBtn.childNodes[0].textContent = '📷 Foto';
+      fileBtn.title = 'Adjunta foto del ticket/comprobante';
+    } else {
+      fileBtn.childNodes[0].textContent = '📎 Adjuntar';
+      fileBtn.title = '';
+    }
+    if(!fileBtn.classList.contains('has-file')){
+      fileBtn.childNodes[0].textContent = tipo==='Factura'?'📋 PDF/XML':tipo==='Foto ticket'||tipo==='Propina'?'📷 Foto':'📎 Adjuntar';
+    }
+  }
+  recalc();
+}
+
+function onTipoTrasfertaChange(){
+  const isNacional = document.getElementById('traf-nacional').checked;
+  // Update all existing rows - add/remove Factura option
+  document.querySelectorAll('.expense-row').forEach(tr=>{
+    const sel = tr.querySelector('.f-tipo');
+    if(!sel) return;
+    const currentVal = sel.value;
+    const hasFactura = Array.from(sel.options).some(o=>o.value==='Factura');
+    if(isNacional && !hasFactura){
+      const opt = document.createElement('option');
+      opt.value='Factura'; opt.textContent='🧾 Factura';
+      sel.insertBefore(opt, sel.firstChild);
+    } else if(!isNacional && hasFactura){
+      Array.from(sel.options).filter(o=>o.value==='Factura').forEach(o=>o.remove());
+      if(sel.value==='Factura') sel.value='Foto ticket';
+    }
+    const rid = tr.dataset.rid;
+    if(rid) onTipoChange(sel, rid);
+  });
+  // Update progress bar and alert
+  recalc();
+  updateAlertBar();
+}
+
+function updateAlertBar(){
+  const isNacional = document.getElementById('traf-nacional').checked;
+  const alertBar = document.getElementById('alert-bar');
+  const progressWrap = document.querySelector('.progress-wrap');
+  if(isNacional){
+    alertBar.className='alert info';
+    alertBar.innerHTML='ℹ️  Trasferta <strong>Nacional</strong>: debes respaldar al menos el <strong>70%</strong> del total gastado con <strong>Facturas</strong> (con Serie y Número).';
+    if(progressWrap) progressWrap.style.display='block';
+  } else {
+    alertBar.className='alert ok';
+    alertBar.innerHTML='✈️  Trasferta <strong>Internacional</strong>: no hay obligación de facturas. Documenta cada gasto con <strong>foto del ticket</strong>. Las facturas del aeropuerto u otros proveedores siguen siendo bienvenidas.';
+    if(progressWrap) progressWrap.style.display='none';
+  }
 }
 
 function onFileChange(input, rid){
@@ -510,7 +598,6 @@ function onFileChange(input, rid){
     const file = input.files[0];
     const ext  = file.name.split('.').pop().toLowerCase();
     const validExts = ['pdf','xml','jpg','jpeg','png','heic'];
-    // Controlla se la riga è tipo Factura
     const row  = btn.closest('tr');
     const tipo = row ? row.querySelector('.f-tipo').value : '';
     if(tipo==='Factura' && !validExts.includes(ext)){
@@ -531,6 +618,7 @@ function delRow(btn, cat){
 }
 
 function recalc(){
+  const isNacional = document.getElementById('traf-nacional').checked;
   let totalGastado=0, totalFactura=0;
   ['rest','hotel','trans','mat','otros'].forEach(cat=>{
     let catTotal=0, catCount=0;
@@ -540,19 +628,20 @@ function recalc(){
       catTotal += monto;
       catCount++;
       totalGastado += monto;
-      // Factura conta solo se ha un file allegato
-      const fileInput = tr.querySelector('.f-file');
-      const hasFile = fileInput && fileInput.files && fileInput.files.length > 0;
-      if(tipo==='Factura' && hasFile) totalFactura += monto;
-      // Evidenzia visivamente le fatture senza file
-      const fileBtn = tr.querySelector('.file-btn');
-      if(fileBtn){
-        if(tipo==='Factura' && !hasFile && monto>0){
-          fileBtn.style.borderColor='#d63c3c';
-          fileBtn.title='Adjunta el XML o PDF de la factura';
-        } else {
-          fileBtn.style.borderColor='';
-          fileBtn.title='';
+      // Factura conta solo se ha un file allegato (solo per Nacional)
+      if(isNacional && tipo==='Factura'){
+        const fileInput = tr.querySelector('.f-file');
+        const hasFile = fileInput && fileInput.files && fileInput.files.length > 0;
+        if(hasFile) totalFactura += monto;
+        // Evidenzia visivamente le fatture senza file
+        const fileBtn = tr.querySelector('.file-btn');
+        if(fileBtn){
+          if(!hasFile && monto>0){
+            fileBtn.style.borderColor='#d63c3c';
+            fileBtn.title='Adjunta el XML o PDF de la factura';
+          } else {
+            fileBtn.style.borderColor='';
+          }
         }
       }
     });
@@ -563,7 +652,7 @@ function recalc(){
   });
 
   const diff = ANTICIPO.monto - totalGastado;
-  const pct  = totalGastado>0 ? Math.round((totalFactura/totalGastado)*100) : 0;
+  const pct  = isNacional && totalGastado>0 ? Math.round((totalFactura/totalGastado)*100) : (isNacional?0:100);
 
   document.getElementById('sum-gastado').textContent = fmtMXN(totalGastado);
   const diffEl = document.getElementById('sum-diff');
@@ -571,68 +660,90 @@ function recalc(){
   diffEl.className = 'sum-value '+(diff>=0?'green':'red');
 
   const pctEl = document.getElementById('sum-pct');
-  pctEl.textContent = pct+'%';
-  pctEl.className = 'sum-value '+(pct>=70?'green':pct>=40?'orange':'red');
+  if(isNacional){
+    pctEl.textContent = pct+'%';
+    pctEl.className = 'sum-value '+(pct>=70?'green':pct>=40?'orange':'red');
+  } else {
+    pctEl.textContent = 'N/A';
+    pctEl.className = 'sum-value green';
+  }
 
-  const fill = document.getElementById('prog-fill');
-  fill.style.width = Math.min(pct,100)+'%';
-  fill.style.background = pct>=70?'var(--green)':pct>=40?'var(--orange)':'var(--red)';
-  document.getElementById('prog-label').textContent =
-    pct+'% — '+(pct>=70?'✅ Requisito cumplido':'⚠️ Mínimo requerido: 70%');
-  // Conta fatture senza file
-  let factSinFile = 0;
-  document.querySelectorAll('.expense-row').forEach(tr=>{
-    const tipo = tr.querySelector('.f-tipo').value;
-    const monto = parseFloat(tr.querySelector('.f-monto').value)||0;
-    const fi = tr.querySelector('.f-file');
-    if(tipo==='Factura' && monto>0 && !(fi && fi.files && fi.files.length>0)) factSinFile++;
-  });
-  const noteExtra = factSinFile>0 ? ' ⚠️ '+factSinFile+' factura(s) sin archivo adjunto — no cuentan para el porcentaje.' : '';
-  document.getElementById('prog-note').textContent =
-    pct>=70 && factSinFile===0
-      ? 'Excelente. El respaldo con facturas es suficiente para procesar la justificación.'
-      : factSinFile>0
-        ? 'Adjunta el PDF o XML de cada factura para que cuente en el porcentaje.'+noteExtra
-        : 'Faltan '+(70-pct)+'% para alcanzar el mínimo. Agrega más gastos con tipo "Factura" y adjunta el comprobante.';
+  if(isNacional){
+    const fill = document.getElementById('prog-fill');
+    fill.style.width = Math.min(pct,100)+'%';
+    fill.style.background = pct>=70?'var(--green)':pct>=40?'var(--orange)':'var(--red)';
+    document.getElementById('prog-label').textContent =
+      pct+'% — '+(pct>=70?'✅ Requisito cumplido':'⚠️ Mínimo requerido: 70%');
+    let factSinFile = 0;
+    document.querySelectorAll('.expense-row').forEach(tr=>{
+      const tipo = tr.querySelector('.f-tipo').value;
+      const monto = parseFloat(tr.querySelector('.f-monto').value)||0;
+      const fi = tr.querySelector('.f-file');
+      if(tipo==='Factura' && monto>0 && !(fi && fi.files && fi.files.length>0)) factSinFile++;
+    });
+    const noteExtra = factSinFile>0 ? ' ⚠️ '+factSinFile+' factura(s) sin archivo adjunto — no cuentan para el porcentaje.' : '';
+    document.getElementById('prog-note').textContent =
+      pct>=70 && factSinFile===0
+        ? 'Excelente. El respaldo con facturas es suficiente para procesar la justificación.'
+        : factSinFile>0
+          ? 'Adjunta el PDF o XML de cada factura para que cuente en el porcentaje.'+noteExtra
+          : 'Faltan '+(70-pct)+'% para alcanzar el mínimo. Agrega más gastos con tipo "Factura" y adjunta el comprobante.';
+  }
 
   const alertBar = document.getElementById('alert-bar');
-  if(pct>=70){
-    alertBar.className='alert ok';
-    alertBar.innerHTML='✅  Respaldo con Facturas: <strong>'+pct+'%</strong> — Requisito cumplido correctamente.';
-  } else if(totalGastado>0){
-    alertBar.className='alert warn';
-    alertBar.innerHTML='⚠️  Respaldo actual con Facturas: <strong>'+pct+'%</strong>. Necesitas al menos el <strong>70%</strong>. Faltan <strong>'+(70-pct)+'%</strong>.';
+  if(isNacional){
+    if(pct>=70){
+      alertBar.className='alert ok';
+      alertBar.innerHTML='✅  Respaldo con Facturas: <strong>'+pct+'%</strong> — Requisito cumplido correctamente.';
+    } else if(totalGastado>0){
+      alertBar.className='alert warn';
+      alertBar.innerHTML='⚠️  Respaldo actual con Facturas: <strong>'+pct+'%</strong>. Necesitas al menos el <strong>70%</strong>. Faltan <strong>'+(70-pct)+'%</strong>.';
+    } else {
+      alertBar.className='alert info';
+      alertBar.innerHTML='ℹ️  Trasferta <strong>Nacional</strong>: debes respaldar al menos el <strong>70%</strong> del total gastado con <strong>Facturas</strong> (con Serie y Número).';
+    }
   }
 }
 
 function recopilarDatos(){
+  const isNacional = document.getElementById('traf-nacional').checked;
+  const tipoTrasferta = isNacional ? 'Nacional' : 'Internacional';
   const gastos = [];
   ['rest','hotel','trans','mat','otros'].forEach(cat=>{
     document.querySelectorAll('#'+cat+'-rows .expense-row').forEach(tr=>{
       const file = tr.querySelector('.f-file').files[0];
+      const tipo = tr.querySelector('.f-tipo').value;
+      const serie = tr.querySelector('.f-serie') ? tr.querySelector('.f-serie').value.trim() : '';
+      const numero = tr.querySelector('.f-numero') ? tr.querySelector('.f-numero').value.trim() : '';
       gastos.push({
         categoria:    CATS[cat].label,
         fecha:        tr.querySelector('.f-fecha').value,
         descripcion:  tr.querySelector('.f-desc').value,
-        tipo:         tr.querySelector('.f-tipo').value,
+        tipo,
+        serie:        tipo==='Factura' ? serie : '',
+        numero:       tipo==='Factura' ? numero : '',
         monto:        parseFloat(tr.querySelector('.f-monto').value)||0,
         archivo:      file ? file.name : '',
       });
     });
   });
   const totalGastado = gastos.reduce((s,g)=>s+g.monto,0);
-  const totalFactura = gastos.filter(g=>g.tipo==='Factura').reduce((s,g)=>s+g.monto,0);
+  const totalFactura = isNacional
+    ? gastos.filter(g=>g.tipo==='Factura' && g.archivo).reduce((s,g)=>s+g.monto,0)
+    : totalGastado; // internacional: tutto conta
   const pct = totalGastado>0 ? Math.round((totalFactura/totalGastado)*100) : 0;
+  const estadoOk = isNacional ? pct>=70 : true;
   return {
     anticipoID: ANTICIPO.id,
     empleado:   ANTICIPO.empleado,
     email:      ANTICIPO.email,
     proyecto:   ANTICIPO.proyecto,
     montoAnticipo: ANTICIPO.monto,
+    tipoTrasferta,
     totalGastado,
     diferencia: ANTICIPO.monto - totalGastado,
-    porcentajeFacturas: pct,
-    estado: pct>=70 ? 'Completa' : 'Incompleta — requiere más facturas',
+    porcentajeFacturas: isNacional ? pct : null,
+    estado: estadoOk ? 'Completa' : 'Incompleta — requiere más facturas',
     notas:  document.getElementById('notas-generales').value,
     firma:  document.getElementById('firma-nombre').value,
     fechaEnvio: document.getElementById('firma-fecha').value,
@@ -701,11 +812,73 @@ async function msalLogin(){
   await msalInstance.loginRedirect({scopes:SP_SCOPES});
 }
 
+// ── UPLOAD FILE A SHAREPOINT ──────────────────────────────────────────
+const LIB_COMPROBANTES = 'GME_Comprobantes';
+
+async function uploadFileToSP(token, anticipoID, fileName, fileData){
+  // 1. Crea cartella se non esiste
+  const folderUrl = `${SP_URL}/_api/web/folders`;
+  try {
+    await fetch(folderUrl, {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json;odata=nometadata',
+        'Content-Type': 'application/json;odata=nometadata',
+        'Authorization': 'Bearer '+token
+      },
+      body: JSON.stringify({ ServerRelativeUrl: `/sites/GefitMexicoEngineering/${LIB_COMPROBANTES}/${anticipoID}` })
+    });
+  } catch(e){ /* cartella già esistente, ignora */ }
+
+  // 2. Upload file
+  const safeName = fileName.replace(/[#%&*:<>?/\\|]/g,'_');
+  const uploadUrl = `${SP_URL}/_api/web/GetFolderByServerRelativeUrl('/sites/GefitMexicoEngineering/${LIB_COMPROBANTES}/${anticipoID}')/Files/add(url='${encodeURIComponent(safeName)}',overwrite=true)`;
+  const r = await fetch(uploadUrl, {
+    method: 'POST',
+    headers: {
+      'Accept': 'application/json;odata=nometadata',
+      'Authorization': 'Bearer '+token,
+      'Content-Length': fileData.byteLength
+    },
+    body: fileData
+  });
+  return r.ok;
+}
+
+async function subirTodosLosArchivos(token, anticipoID){
+  const files = [];
+  let idx = 1;
+  ['rest','hotel','trans','mat','otros'].forEach(cat=>{
+    document.querySelectorAll('#'+cat+'-rows .expense-row').forEach(tr=>{
+      const fi = tr.querySelector('.f-file');
+      if(fi && fi.files && fi.files[0]){
+        const desc = (tr.querySelector('.f-desc').value||cat).replace(/\s+/g,'_').substring(0,20);
+        const ext = fi.files[0].name.split('.').pop();
+        const newName = String(idx).padStart(2,'0')+'_'+desc+'.'+ext;
+        files.push({file: fi.files[0], name: newName});
+        idx++;
+      }
+    });
+  });
+
+  if(!files.length) return [];
+
+  const uploaded = [];
+  for(const f of files){
+    try {
+      const buf = await f.file.arrayBuffer();
+      const ok = await uploadFileToSP(token, anticipoID, f.name, buf);
+      if(ok) uploaded.push(f.name);
+    } catch(e){ console.warn('Error subiendo '+f.name, e); }
+  }
+  return uploaded;
+}
+
 async function enviarJustificacion(){
   const d = recopilarDatos();
   if(!d.firma){alert('Por favor ingresa tu nombre completo en el campo de firma.');return;}
   if(d.gastos.length===0){alert('Agrega al menos un gasto antes de enviar.');return;}
-  if(d.porcentajeFacturas<70){
+  if(d.tipoTrasferta==='Nacional' && d.porcentajeFacturas<70){
     const ok=confirm('El respaldo con Facturas es del '+d.porcentajeFacturas+'% (minimo 70%). Deseas enviar de todas formas? La justificacion quedara marcada como Incompleta.');
     if(!ok)return;
   }
@@ -714,9 +887,20 @@ async function enviarJustificacion(){
   if(btn){btn.disabled=true;btn.textContent='Enviando...';}
 
   let spOk = false;
+  let archivosSubidos = [];
   try {
-    const digest = await getToken();
-    if(digest){
+    const token = await getToken();
+    if(token){
+      // 1. Sube los archivos a GME_Comprobantes
+      if(btn) btn.textContent='Subiendo archivos...';
+      archivosSubidos = await subirTodosLosArchivos(token, d.anticipoID);
+
+      // 2. Actualiza nombres de archivo en gastos con los nombres normalizados
+      let idx = 0;
+      d.gastos.forEach(g=>{ if(g.archivo){ g.archivo = archivosSubidos[idx]||g.archivo; idx++; } });
+
+      // 3. Guarda en GME_Justificaciones
+      if(btn) btn.textContent='Guardando justificación...';
       const payload = {
         Title:              d.anticipoID+'-'+Date.now(),
         AnticipoID:         d.anticipoID,
@@ -725,8 +909,9 @@ async function enviarJustificacion(){
         MontoAnticipo:      d.montoAnticipo,
         TotalGastado:       d.totalGastado,
         Diferencia:         d.diferencia,
-        PorcentajeFacturas: d.porcentajeFacturas,
-        Estado:             d.porcentajeFacturas>=70?'Completa':'Incompleta',
+        PorcentajeFacturas: d.porcentajeFacturas !== null ? d.porcentajeFacturas : 100,
+        TipoTrasferta:      d.tipoTrasferta,
+        Estado:             d.estado==='Completa'?'Completa':'Incompleta',
         Gastos:             JSON.stringify(d.gastos),
         Notas:              d.notas||'',
         Firma:              d.firma,
@@ -737,7 +922,7 @@ async function enviarJustificacion(){
         headers:{
           'Accept':'application/json;odata=nometadata',
           'Content-Type':'application/json;odata=nometadata',
-          'Authorization':'Bearer '+digest
+          'Authorization':'Bearer '+token
         },
         body: JSON.stringify(payload)
       });
@@ -753,11 +938,15 @@ async function enviarJustificacion(){
 
   if(btn){btn.disabled=false;btn.innerHTML='Enviar justificacion';}
 
-  const msg = spOk
-    ? (d.porcentajeFacturas>=70
-        ? 'Justificacion enviada y guardada en SharePoint ('+d.porcentajeFacturas+'% con facturas).'
-        : 'Enviada con observacion: '+d.porcentajeFacturas+'% con facturas. El administrador revisara el caso.')
-    : 'Justificacion guardada localmente. Verifica tu conexion con Microsoft 365.';
+  let msg;
+  if(spOk){
+    const nArch = archivosSubidos.length;
+    msg = `Justificación enviada y guardada en SharePoint.${nArch>0?' '+nArch+' archivo(s) subidos a GME_Comprobantes.':''}`;
+    if(d.tipoTrasferta==='Nacional' && d.porcentajeFacturas<70)
+      msg += ' ('+d.porcentajeFacturas+'% con facturas — el administrador revisará el caso.)';
+  } else {
+    msg = 'Justificación guardada localmente. Verifica tu conexión con Microsoft 365.';
+  }
   document.getElementById('modal-msg').textContent = msg;
   document.getElementById('modal-ok').classList.add('open');
   document.getElementById('btn-export').classList.add('visible');
@@ -821,7 +1010,7 @@ function exportarResumen(){
 }
 
 // Auto-open primera sección
-window.onload = async () => { await msalInstance.initialize(); msalInit(); initForm(); addRow('rest'); toggleSection('rest'); };
+window.onload = async () => { await msalInstance.initialize(); msalInit(); initForm(); addRow('rest'); toggleSection('rest'); updateAlertBar(); };
 </script>
 </body>
 </html>

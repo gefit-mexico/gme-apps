@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>GEFIT Mexico — Panel Administrativo · Anticipos</title>
 <script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -436,6 +438,42 @@ body{font-family:"DM Sans",sans-serif;background:#eef3f8;color:var(--gray);min-h
   </div>
 </div>
 
+<!-- MODAL PAQUETE CONTABLE -->
+<div class="modal-overlay" id="modal-paquete">
+  <div class="modal" style="max-width:520px;text-align:left">
+    <div style="font-size:36px;text-align:center">📦</div>
+    <h2 style="text-align:center">Paquete Contable</h2>
+    <p style="text-align:center;font-size:13px;color:#888;margin-bottom:20px" id="paquete-subtitle">Genera el ZIP con todos los comprobantes y el Excel para el contador.</p>
+    <div style="background:var(--gray-l);border-radius:10px;padding:16px;margin-bottom:16px">
+      <div style="font-size:12px;font-weight:600;color:var(--gray-d);margin-bottom:10px;text-transform:uppercase;letter-spacing:.4px">📎 Adjuntar recibo SPEI (opcional)</div>
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;border:1.5px dashed var(--blue-mid);border-radius:8px;padding:12px;background:var(--white);transition:all .15s" id="spei-label">
+        <span style="font-size:20px">🏦</span>
+        <div>
+          <div style="font-size:13px;font-weight:600;color:var(--blue-d)" id="spei-name">Seleccionar recibo BanRegio (PDF)</div>
+          <div style="font-size:11px;color:#aaa">PDF del comprobante de transferencia SPEI</div>
+        </div>
+        <input type="file" id="spei-file" accept=".pdf,.jpg,.jpeg,.png" style="display:none" onchange="onSpeiFileChange()">
+      </label>
+    </div>
+    <div style="background:var(--blue-xl);border-radius:10px;padding:14px;margin-bottom:20px;font-size:12px;color:var(--blue-d)">
+      <strong>El ZIP incluirá:</strong><br>
+      📊 Excel con rendiconto completo<br>
+      🏦 Recibo SPEI (si adjuntado)<br>
+      🖼️ Todos los comprobantes del empleado
+    </div>
+    <div id="paquete-progress" style="display:none;margin-bottom:16px">
+      <div style="font-size:13px;color:var(--blue-d);margin-bottom:6px" id="paquete-progress-msg">Descargando archivos...</div>
+      <div style="background:var(--gray-m);border-radius:10px;height:6px;overflow:hidden">
+        <div id="paquete-progress-bar" style="height:100%;background:var(--blue);border-radius:10px;width:0%;transition:width .3s"></div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" id="btn-generar-paquete" onclick="generarPaqueteContable()">📦 Generar ZIP</button>
+      <button class="btn btn-sec" onclick="cerrarModalPaquete()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <div class="footer">Panel Administrativo · GEFIT Mexico Engineering S.A. de C.V. &nbsp;|&nbsp; Desarrollado por José Oscar Gullino</div>
@@ -616,6 +654,7 @@ function spItemToJustif(item){
     totalGastado:       item.TotalGastado,
     diferencia:         item.Diferencia,
     porcentajeFacturas: item.PorcentajeFacturas,
+    tipoTrasferta:      item.TipoTrasferta||'Nacional',
     estado:             item.Estado,
     gastos,
     notas:              item.Notas||"",
@@ -816,9 +855,21 @@ function detailHtml(a){
   const j=a.justificacion;
   let gastosHtml="";
   if(j&&j.gastos&&j.gastos.length){
-    gastosHtml=`<table class="gastos-mini"><thead><tr><th>Categoría</th><th>Descripción</th><th>Tipo</th><th style="text-align:right">Monto</th></tr></thead>
-    <tbody>${j.gastos.map(g=>`<tr><td>${g.categoria}</td><td>${g.descripcion||"—"}</td><td>${g.tipo}</td><td style="text-align:right">${fmtMXN(g.monto)}</td></tr>`).join("")}</tbody></table>`;
+    gastosHtml=`<table class="gastos-mini"><thead><tr><th>Categoría</th><th>Descripción</th><th>Tipo</th><th>Serie/Número</th><th style="text-align:right">Monto</th><th>Archivo</th></tr></thead>
+    <tbody>${j.gastos.map(g=>`<tr>
+      <td>${g.categoria}</td>
+      <td>${g.descripcion||"—"}</td>
+      <td>${g.tipo}</td>
+      <td style="font-size:11px;color:#888">${g.tipo==='Factura'&&(g.serie||g.numero)?(g.serie?g.serie+' ':'')+(g.numero||''):'—'}</td>
+      <td style="text-align:right">${fmtMXN(g.monto)}</td>
+      <td style="font-size:11px;color:${g.archivo?'var(--blue-d)':'#bbb'}">${g.archivo||'—'}</td>
+    </tr>`).join("")}</tbody></table>`;
   }
+  const tipoTrasferta = j&&j.tipoTrasferta ? j.tipoTrasferta : null;
+  const tipoChip = tipoTrasferta ? `<div class="detail-item"><div class="dl">Tipo trasferta</div><div class="dv">${tipoTrasferta==='Internacional'?'✈️ Internacional':'🇲🇽 Nacional'}</div></div>` : '';
+  const pctHtml = tipoTrasferta==='Internacional'
+    ? `<div class="detail-item"><div class="dl">% Facturas</div><div class="dv green">N/A (Internacional)</div></div>`
+    : j ? `<div class="detail-item"><div class="dl">% Facturas</div><div class="dv ${(j.porcentajeFacturas||0)>=70?"green":"orange"}">${j.porcentajeFacturas||0}%</div></div>` : '';
   return `<div class="detail-panel open">
     <div class="detail-grid">
       <div class="detail-item"><div class="dl">Empleado</div><div class="dv">${a.empleado}</div></div>
@@ -827,9 +878,10 @@ function detailHtml(a){
       <div class="detail-item"><div class="dl">Monto anticipo</div><div class="dv">${fmtMXN(a.monto)}</div></div>
       <div class="detail-item"><div class="dl">Destino</div><div class="dv">${a.destino||"—"}</div></div>
       <div class="detail-item"><div class="dl">Fecha emisión</div><div class="dv" style="font-size:12px">${a.fechaEmision?new Date(a.fechaEmision).toLocaleDateString("es-MX"):"—"}</div></div>
+      ${tipoChip}
       ${j?`
       <div class="detail-item"><div class="dl">Total gastado</div><div class="dv ${(j.totalGastado||0)>(a.monto||0)?"red":""}">${fmtMXN(j.totalGastado)}</div></div>
-      <div class="detail-item"><div class="dl">% Facturas</div><div class="dv ${(j.porcentajeFacturas||0)>=70?"green":"orange"}">${j.porcentajeFacturas||0}%</div></div>
+      ${pctHtml}
       <div class="detail-item"><div class="dl">Diferencia</div><div class="dv">${fmtMXN(j.diferencia)}</div></div>`:""}
     </div>
     ${j?`<div style="margin-bottom:8px;font-size:12px;font-weight:600;color:var(--gray-d)">Detalle de gastos</div>${gastosHtml}`:'<p style="font-size:13px;color:#aaa">El empleado aún no ha enviado su justificación.</p>'}
@@ -842,6 +894,7 @@ function detailHtml(a){
       :`${badgeHtml(a.estadoAdmin)}
         <button class="btn btn-sec" onclick="resetEstado('${a.id}',event)" style="margin-left:8px">↩ Reabrir</button>`}
       <button class="btn btn-sec" onclick="reenviarEmail('${a.id}',event)">📧 Reenviar link</button>
+      ${a.justificacion?`<button class="btn btn-sec" style="background:var(--blue-xl);color:var(--blue-d);border-color:var(--blue-mid)" onclick="abrirModalPaquete('${a.id}',event)">📦 Paquete contable</button>`:''}
     </div>
   </div>`;
 }
@@ -1147,6 +1200,152 @@ function histLimpiar(){
   document.getElementById("hist-resultado").style.display="none";
   document.getElementById("hist-resumen").style.display="none";
   histRowCounter=0;
+}
+
+// ── PAQUETE CONTABLE ───────────────────────────────────────────────────────────
+const LIB_COMPROBANTES = 'GME_Comprobantes';
+let paqueteAnticipo = null;
+
+function abrirModalPaquete(id, evt){
+  evt&&evt.stopPropagation();
+  paqueteAnticipo = anticipos.find(a=>a.id===id);
+  if(!paqueteAnticipo||!paqueteAnticipo.justificacion){ toast('❌ No hay justificación para este anticipo'); return; }
+  document.getElementById('paquete-subtitle').textContent =
+    `${paqueteAnticipo.empleado} · ${paqueteAnticipo.id} · ${fmtMXN(paqueteAnticipo.monto)}`;
+  document.getElementById('spei-name').textContent = 'Seleccionar recibo BanRegio (PDF)';
+  document.getElementById('spei-file').value='';
+  document.getElementById('paquete-progress').style.display='none';
+  document.getElementById('modal-paquete').classList.add('open');
+}
+
+function cerrarModalPaquete(){
+  document.getElementById('modal-paquete').classList.remove('open');
+  paqueteAnticipo = null;
+}
+
+function onSpeiFileChange(){
+  const f = document.getElementById('spei-file').files[0];
+  if(f) document.getElementById('spei-name').textContent = '✅ '+f.name;
+}
+
+async function descargarArchivoSP(token, anticipoID, fileName){
+  const url = `${SP_URL}/_api/web/GetFileByServerRelativeUrl('/sites/GefitMexicoEngineering/${LIB_COMPROBANTES}/${anticipoID}/${encodeURIComponent(fileName)}')/$value`;
+  const r = await fetch(url, { headers:{ 'Authorization':'Bearer '+token } });
+  if(!r.ok) return null;
+  return await r.arrayBuffer();
+}
+
+function generarExcelContable(ant){
+  const j = ant.justificacion;
+  const wb = XLSX.utils.book_new();
+
+  // Hoja 1: Resumen
+  const resumen = [
+    ['GEFIT Mexico Engineering S.A. de C.V.'],
+    ['Rendiconto Anticipo de Viaje'],
+    [],
+    ['ID Anticipo', ant.id],
+    ['Empleado', ant.empleado],
+    ['Email', ant.email],
+    ['Proyecto', ant.proyecto],
+    ['Tipo trasferta', j.tipoTrasferta||'Nacional'],
+    ['Monto anticipo', ant.monto],
+    ['Total gastado', j.totalGastado],
+    ['Diferencia', j.diferencia],
+    ['% Facturas', j.tipoTrasferta==='Internacional'?'N/A (Internacional)':(j.porcentajeFacturas||0)+'%'],
+    ['Estado', j.estado],
+    ['Firma empleado', j.firma],
+    ['Fecha envío', j.fechaEnvio],
+    ['Estado admin', ant.estadoAdmin],
+    ['Nota admin', ant.nota_admin||''],
+  ];
+  const ws1 = XLSX.utils.aoa_to_sheet(resumen);
+  ws1['!cols'] = [{wch:22},{wch:35}];
+  XLSX.utils.book_append_sheet(wb, ws1, 'Resumen');
+
+  // Hoja 2: Detalle gastos
+  const headers = ['#','Categoría','Fecha','Descripción','Tipo','Serie','Número Factura','Monto MXN','Archivo'];
+  const rows = j.gastos.map((g,i)=>[
+    i+1, g.categoria, g.fecha, g.descripcion, g.tipo,
+    g.serie||'', g.numero||'',
+    g.monto, g.archivo||''
+  ]);
+  rows.push(['','','','','','','TOTAL', j.totalGastado,'']);
+  const ws2 = XLSX.utils.aoa_to_sheet([headers,...rows]);
+  ws2['!cols'] = [{wch:4},{wch:16},{wch:12},{wch:28},{wch:14},{wch:8},{wch:16},{wch:12},{wch:28}];
+  XLSX.utils.book_append_sheet(wb, ws2, 'Detalle Gastos');
+
+  return XLSX.write(wb, {bookType:'xlsx', type:'array'});
+}
+
+async function generarPaqueteContable(){
+  if(!paqueteAnticipo) return;
+  const ant = paqueteAnticipo;
+  const j = ant.justificacion;
+
+  const btn = document.getElementById('btn-generar-paquete');
+  btn.disabled=true; btn.textContent='⏳ Generando...';
+  document.getElementById('paquete-progress').style.display='block';
+
+  const setProgress = (msg, pct) => {
+    document.getElementById('paquete-progress-msg').textContent = msg;
+    document.getElementById('paquete-progress-bar').style.width = pct+'%';
+  };
+
+  try {
+    const zip = new JSZip();
+    const folder = zip.folder(ant.id);
+
+    // 1. Excel
+    setProgress('Generando Excel...', 10);
+    const xlsxData = generarExcelContable(ant);
+    folder.file(`Rendiconto_${ant.id}.xlsx`, xlsxData);
+
+    // 2. Recibo SPEI
+    const speiFile = document.getElementById('spei-file').files[0];
+    if(speiFile){
+      setProgress('Agregando recibo SPEI...', 20);
+      const speiData = await speiFile.arrayBuffer();
+      const speiExt = speiFile.name.split('.').pop();
+      folder.file(`SPEI_${ant.id}.${speiExt}`, speiData);
+    }
+
+    // 3. Comprobantes desde SharePoint
+    const archivos = j.gastos.filter(g=>g.archivo).map(g=>g.archivo);
+    if(archivos.length > 0){
+      setProgress('Descargando comprobantes de SharePoint...', 30);
+      const token = await getToken();
+      if(token){
+        for(let i=0; i<archivos.length; i++){
+          setProgress(`Descargando ${archivos[i]}...`, 30 + Math.round((i/archivos.length)*60));
+          try {
+            const data = await descargarArchivoSP(token, ant.id, archivos[i]);
+            if(data) folder.file(archivos[i], data);
+          } catch(e){ console.warn('No se pudo descargar:', archivos[i], e); }
+        }
+      } else {
+        toast('⚠️ Sin token SP — comprobantes no incluidos. Inicia sesión primero.');
+      }
+    }
+
+    setProgress('Comprimiendo ZIP...', 95);
+    const zipBlob = await zip.generateAsync({type:'blob', compression:'DEFLATE', compressionOptions:{level:6}});
+    setProgress('¡Listo!', 100);
+
+    // Descarga
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(zipBlob);
+    a.download = `Contable_${ant.id}_${ant.empleado.replace(/ /g,'_')}.zip`;
+    a.click();
+
+    setTimeout(()=>{ cerrarModalPaquete(); toast('✅ Paquete contable descargado'); }, 500);
+
+  } catch(e){
+    console.error('Error generando paquete:', e);
+    toast('❌ Error generando el paquete: '+e.message);
+  }
+
+  btn.disabled=false; btn.textContent='📦 Generar ZIP';
 }
 
 // ── INIT ───────────────────────────────────────────────────────────────────────
