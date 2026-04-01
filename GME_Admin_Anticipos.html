@@ -454,7 +454,13 @@ const msalConfig = {
     authority: "https://login.microsoftonline.com/5e9917fe-df22-4e96-a361-9e14199c0a13",
     redirectUri: "https://gefit-mexico.github.io/gme-apps/GME_Admin_Anticipos.html"
   },
-  cache: { cacheLocation: "sessionStorage" }
+  cache: { cacheLocation: "sessionStorage" },
+  system: {
+    windowHashTimeout: 9000,
+    iframeHashTimeout: 9000,
+    loadFrameTimeout: 9000,
+    asyncPopups: false
+  }
 };
 const msalInstance = new msal.PublicClientApplication(msalConfig);
 const SP_SCOPES = ["https://gefit.sharepoint.com/AllSites.Write"];
@@ -468,10 +474,10 @@ async function getToken(){
       const r = await msalInstance.acquireTokenSilent({scopes:SP_SCOPES, account:accounts[0]});
       msalToken = r.accessToken; return msalToken;
     } catch(e){
-      // Silent fallito, usa redirect
-      sessionStorage.setItem('msal_pending_action', 'reload');
-      await msalInstance.acquireTokenRedirect({scopes:SP_SCOPES, account:accounts[0]});
-      return null;
+      try {
+        const r = await msalInstance.acquireTokenPopup({scopes:SP_SCOPES, account:accounts[0]});
+        msalToken = r.accessToken; return msalToken;
+      } catch(e2){ return null; }
     }
   }
   return null;
@@ -1148,8 +1154,12 @@ function histLimpiar(){
 // ── INIT ───────────────────────────────────────────────────────────────────────
 async function msalLogin(){
   try {
-    sessionStorage.setItem('msal_pending_action', 'reload');
-    await msalInstance.loginRedirect({scopes:SP_SCOPES});
+    const r = await msalInstance.loginPopup({scopes:SP_SCOPES});
+    msalToken = r.accessToken;
+    document.getElementById("msal-user").textContent = r.account.username;
+    document.getElementById("msal-status").style.display = "flex";
+    document.getElementById("msal-login-bar").style.display = "none";
+    cargarDatos();
   } catch(e){ toast("❌ Login fallido: "+e.message); }
 }
 
