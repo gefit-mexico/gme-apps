@@ -467,25 +467,42 @@ async function getToken(){
     try {
       const r = await msalInstance.acquireTokenSilent({scopes:SP_SCOPES, account:accounts[0]});
       msalToken = r.accessToken; return msalToken;
-    } catch(e){}
+    } catch(e){
+      // Silent fallito, usa redirect
+      sessionStorage.setItem('msal_pending_action', 'reload');
+      await msalInstance.acquireTokenRedirect({scopes:SP_SCOPES, account:accounts[0]});
+      return null;
+    }
   }
-  try {
-    const r = await msalInstance.acquireTokenPopup({scopes:SP_SCOPES});
-    msalToken = r.accessToken; return msalToken;
-  } catch(e){ toast("❌ Error de autenticación: "+e.message); return null; }
+  return null;
 }
 
 async function msalInit(){
   await msalInstance.initialize();
-  // Gestisci redirect
-  try { await msalInstance.handleRedirectPromise(); } catch(e){}
+  try {
+    const response = await msalInstance.handleRedirectPromise();
+    if(response && response.accessToken){
+      msalToken = response.accessToken;
+      document.getElementById("msal-user").textContent = response.account.username;
+      document.getElementById("msal-status").style.display = "flex";
+      document.getElementById("msal-login-bar").style.display = "none";
+      return;
+    }
+  } catch(e){ console.warn("Redirect error:", e); }
+  
   const accounts = msalInstance.getAllAccounts();
   if(accounts.length > 0){
-    document.getElementById("msal-user").textContent = accounts[0].username;
-    document.getElementById("msal-status").style.display = "flex";
+    try {
+      const r = await msalInstance.acquireTokenSilent({scopes:SP_SCOPES, account:accounts[0]});
+      msalToken = r.accessToken;
+      document.getElementById("msal-user").textContent = accounts[0].username;
+      document.getElementById("msal-status").style.display = "flex";
+      document.getElementById("msal-login-bar").style.display = "none";
+    } catch(e){
+      document.getElementById("msal-login-bar").style.display = "flex";
+    }
   } else {
-    // Mostra bottone login
-    document.getElementById("msal-login-btn").style.display = "inline-flex";
+    document.getElementById("msal-login-bar").style.display = "flex";
   }
 }
 
@@ -1131,12 +1148,8 @@ function histLimpiar(){
 // ── INIT ───────────────────────────────────────────────────────────────────────
 async function msalLogin(){
   try {
-    const r = await msalInstance.loginPopup({scopes:SP_SCOPES});
-    msalToken = r.accessToken;
-    document.getElementById("msal-user").textContent = r.account.username;
-    document.getElementById("msal-status").style.display = "flex";
-    document.getElementById("msal-login-bar").style.display = "none";
-    cargarDatos();
+    sessionStorage.setItem('msal_pending_action', 'reload');
+    await msalInstance.loginRedirect({scopes:SP_SCOPES});
   } catch(e){ toast("❌ Login fallido: "+e.message); }
 }
 

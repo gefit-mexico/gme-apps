@@ -666,19 +666,21 @@ async function getToken(){
       msalToken = r.accessToken; return msalToken;
     } catch(e){}
   }
-  try {
-    const r = await msalInstance.acquireTokenPopup({scopes:SP_SCOPES});
-    msalToken = r.accessToken;
-    document.getElementById('msal-user').textContent = r.account.username;
-    document.getElementById('msal-bar').style.display = 'flex';
-    document.getElementById('msal-login-bar').style.display = 'none';
-    return msalToken;
-  } catch(e){ return null; }
+  return null;
 }
 
 async function msalInit(){
   await msalInstance.initialize();
-  try { await msalInstance.handleRedirectPromise(); } catch(e){}
+  try {
+    const response = await msalInstance.handleRedirectPromise();
+    if(response && response.accessToken){
+      msalToken = response.accessToken;
+      document.getElementById('msal-user').textContent = response.account.username;
+      document.getElementById('msal-bar').style.display = 'flex';
+      document.getElementById('msal-login-bar').style.display = 'none';
+      return;
+    }
+  } catch(e){ console.warn("Redirect error:", e); }
   const accounts = msalInstance.getAllAccounts();
   if(accounts.length > 0){
     try {
@@ -686,6 +688,7 @@ async function msalInit(){
       msalToken = r.accessToken;
       document.getElementById('msal-user').textContent = accounts[0].username;
       document.getElementById('msal-bar').style.display = 'flex';
+      document.getElementById('msal-login-bar').style.display = 'none';
     } catch(e){
       document.getElementById('msal-login-bar').style.display = 'flex';
     }
@@ -695,7 +698,7 @@ async function msalInit(){
 }
 
 async function msalLogin(){
-  await getToken();
+  await msalInstance.loginRedirect({scopes:SP_SCOPES});
 }
 
 async function enviarJustificacion(){
