@@ -474,10 +474,8 @@ async function getToken(){
       const r = await msalInstance.acquireTokenSilent({scopes:SP_SCOPES, account:accounts[0]});
       msalToken = r.accessToken; return msalToken;
     } catch(e){
-      try {
-        const r = await msalInstance.acquireTokenPopup({scopes:SP_SCOPES, account:accounts[0]});
-        msalToken = r.accessToken; return msalToken;
-      } catch(e2){ return null; }
+      await msalInstance.acquireTokenRedirect({scopes:SP_SCOPES, account:accounts[0]});
+      return null;
     }
   }
   return null;
@@ -492,10 +490,11 @@ async function msalInit(){
       document.getElementById("msal-user").textContent = response.account.username;
       document.getElementById("msal-status").style.display = "flex";
       document.getElementById("msal-login-bar").style.display = "none";
+      cargarDatos();
       return;
     }
   } catch(e){ console.warn("Redirect error:", e); }
-  
+
   const accounts = msalInstance.getAllAccounts();
   if(accounts.length > 0){
     try {
@@ -1153,18 +1152,11 @@ function histLimpiar(){
 
 // ── INIT ───────────────────────────────────────────────────────────────────────
 async function msalLogin(){
-  try {
-    const r = await msalInstance.loginPopup({scopes:SP_SCOPES});
-    msalToken = r.accessToken;
-    document.getElementById("msal-user").textContent = r.account.username;
-    document.getElementById("msal-status").style.display = "flex";
-    document.getElementById("msal-login-bar").style.display = "none";
-    cargarDatos();
-  } catch(e){ toast("❌ Login fallido: "+e.message); }
+  await msalInstance.loginRedirect({scopes:SP_SCOPES});
 }
 
 function msalLogout(){
-  msalInstance.logoutPopup();
+  msalInstance.logoutRedirect();
   msalToken = null;
   document.getElementById("msal-status").style.display = "none";
   document.getElementById("msal-login-bar").style.display = "flex";
