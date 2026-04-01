@@ -636,7 +636,7 @@ async function cargarDatos(){
     // Cruzar justificaciones
     justs.forEach(j=>{
       const jObj = spItemToJustif(j);
-      const ant  = anticipos.find(a=>a.id===jObj.anticipoID);
+      const ant  = anticipos.find(a=>jObj.anticipoID&&(jObj.anticipoID===a.id||jObj.anticipoID.startsWith(a.id)));
       if(ant) ant.justificacion = jObj;
     });
     renderStats(); renderTabla(); renderPendientes(); renderReporte();
