@@ -856,14 +856,19 @@ function detailHtml(a){
   let gastosHtml="";
   if(j&&j.gastos&&j.gastos.length){
     gastosHtml=`<table class="gastos-mini"><thead><tr><th>Categoría</th><th>Descripción</th><th>Tipo</th><th>Serie/Número</th><th style="text-align:right">Monto</th><th>Archivo</th></tr></thead>
-    <tbody>${j.gastos.map(g=>`<tr>
-      <td>${g.categoria}</td>
-      <td>${g.descripcion||"—"}</td>
-      <td>${g.tipo}</td>
-      <td style="font-size:11px;color:#888">${g.tipo==='Factura'&&(g.serie||g.numero)?(g.serie?g.serie+' ':'')+(g.numero||''):'—'}</td>
-      <td style="text-align:right">${fmtMXN(g.monto)}</td>
-      <td style="font-size:11px;color:${g.archivo?'var(--blue-d)':'#bbb'}">${g.archivo||'—'}</td>
-    </tr>`).join("")}</tbody></table>`;
+    <tbody>${j.gastos.map(g=>{
+      const fileUrl = g.archivo
+        ? `https://gefit.sharepoint.com/sites/GefitMexicoEngineering/GME_Comprobantes/${j.anticipoID}/${encodeURIComponent(g.archivo)}`
+        : null;
+      return `<tr>
+        <td>${g.categoria}</td>
+        <td>${g.descripcion||"—"}</td>
+        <td>${g.tipo}</td>
+        <td style="font-size:11px;color:#888">${g.tipo==='Factura'&&(g.serie||g.numero)?(g.serie?g.serie+' ':'')+(g.numero||''):'—'}</td>
+        <td style="text-align:right">${fmtMXN(g.monto)}</td>
+        <td>${fileUrl?`<a href="${fileUrl}" target="_blank" style="color:var(--blue-d);font-size:11px;text-decoration:none" title="Abrir en SharePoint">📎 ${g.archivo}</a>`:'<span style="color:#bbb;font-size:11px">—</span>'}</td>
+      </tr>`;
+    }).join("")}</tbody></table>`;
   }
   const tipoTrasferta = j&&j.tipoTrasferta ? j.tipoTrasferta : null;
   const tipoChip = tipoTrasferta ? `<div class="detail-item"><div class="dl">Tipo trasferta</div><div class="dv">${tipoTrasferta==='Internacional'?'✈️ Internacional':'🇲🇽 Nacional'}</div></div>` : '';
