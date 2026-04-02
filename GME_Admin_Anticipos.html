@@ -764,7 +764,13 @@ async function generarAnticipo(){
   const now = new Date();
   const yy  = now.getFullYear().toString().slice(-2);
   const mm  = String(now.getMonth()+1).padStart(2,"0");
-  const seq = String(anticipos.filter(a=>a.id.startsWith("ANT-"+yy)).length+1).padStart(3,"0");
+  // Calcola il prossimo numero basandosi sul massimo ID esistente in SharePoint
+  const prefix = `ANT-${yy}`;
+  const existingNums = anticipos
+    .filter(a=>a.id.startsWith(prefix))
+    .map(a=>parseInt(a.id.split('-')[2])||0);
+  const maxNum = existingNums.length > 0 ? Math.max(...existingNums) : 0;
+  const seq = String(maxNum+1).padStart(3,"0");
   const id  = `ANT-${yy}${mm}-${seq}`;
 
   const btnGen = document.querySelector('[onclick="generarAnticipo()"]');
