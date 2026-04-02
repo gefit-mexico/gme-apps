@@ -914,7 +914,7 @@ function detailHtml(a){
       </tr>`;
     }).join("")}</tbody></table>
     <div style="margin-top:8px;font-size:11px;color:#aaa">
-      <a href="${folderUrl}" target="_blank" style="color:var(--blue-d);text-decoration:none">📁 Ver todos los archivos en SharePoint</a>
+      📁 ${files.length} archivo(s) en GME_Comprobantes/${j.anticipoID}
     </div>`;
   }
   const tipoTrasferta = j&&j.tipoTrasferta ? j.tipoTrasferta : null;
@@ -1257,33 +1257,59 @@ function histLimpiar(){
 async function abrirComprobante(anticipoID, archivoNombre, evt){
   evt&&evt.stopPropagation();
   const token = await getToken();
-  if(!token){ 
-    // Fallback: apri la cartella SharePoint
-    window.open(`https://gefit.sharepoint.com/sites/GefitMexicoEngineering/GME_Comprobantes/${anticipoID}`, '_blank');
+  if(!token){
+    toast('⚠️ Inicia sesión para ver los archivos');
     return;
   }
+  toast('⏳ Cargando archivo...');
   try {
-    // Cerca i file nella cartella
+    // Lista archivos en la carpeta para encontrar el correcto
     const r = await fetch(
       `${SP_URL}/_api/web/GetFolderByServerRelativeUrl('/sites/GefitMexicoEngineering/GME_Comprobantes/${anticipoID}')/Files`,
       { headers:{ 'Accept':'application/json;odata=nometadata', 'Authorization':'Bearer '+token } }
     );
-    if(!r.ok) throw new Error('Cartella non trovata');
+    if(!r.ok) throw new Error('Carpeta no encontrada');
     const data = await r.json();
     const files = data.value || [];
-    // Cerca per nome esatto o per nome normalizzato (senza estensione)
+
+    // Busca coincidencia por nombre exacto o parcial
     const nomeSenzaExt = archivoNombre.replace(/\.[^.]+$/, '').toLowerCase();
     let match = files.find(f => f.Name === archivoNombre);
-    if(!match) match = files.find(f => f.Name.replace(/\.[^.]+$/, '').toLowerCase().includes(nomeSenzaExt.substring(0,8)));
-    if(match){
-      window.open(`https://gefit.sharepoint.com/sites/GefitMexicoEngineering/GME_Comprobantes/${anticipoID}/${encodeURIComponent(match.Name)}`, '_blank');
-    } else {
-      // Apri la cartella se non trovato
-      window.open(`https://gefit.sharepoint.com/sites/GefitMexicoEngineering/GME_Comprobantes/${anticipoID}`, '_blank');
-      toast('⚠️ Archivo no encontrado — abriendo carpeta');
+    if(!match) match = files.find(f =>
+      f.Name.replace(/\.[^.]+$/, '').toLowerCase().replace(/[_\s]/g,'').includes(
+        nomeSenzaExt.replace(/[_\s]/g,'').substring(0,8)
+      )
+    );
+    if(!match && files.length > 0){
+      // Usa índice si el archivo tiene formato 01_, 02_ etc
+      const idx = archivoNombre.match(/^(\d+)_/);
+      if(idx) match = files.find(f => f.Name.startsWith(idx[1]+'_'));
     }
+
+    const fileName = match ? match.Name : archivoNombre;
+
+    // Descarga el archivo via API (no abre SharePoint)
+    const fileR = await fetch(
+      `${SP_URL}/_api/web/GetFileByServerRelativeUrl('/sites/GefitMexicoEngineering/GME_Comprobantes/${anticipoID}/${encodeURIComponent(fileName)}')/$value`,
+      { headers:{ 'Authorization':'Bearer '+token } }
+    );
+    if(!fileR.ok) throw new Error('Archivo no encontrado: '+fileName);
+
+    const blob = await fileR.blob();
+    const ext = fileName.split('.').pop().toLowerCase();
+    const mimeTypes = {
+      'pdf':'application/pdf','jpg':'image/jpeg','jpeg':'image/jpeg',
+      'png':'image/png','xml':'application/xml','heic':'image/heic'
+    };
+    const blobTyped = new Blob([blob], {type: mimeTypes[ext]||'application/octet-stream'});
+    const url = URL.createObjectURL(blobTyped);
+    window.open(url, '_blank');
+    setTimeout(()=>URL.revokeObjectURL(url), 60000);
+    toast('✅ Archivo abierto');
+
   } catch(e){
-    window.open(`https://gefit.sharepoint.com/sites/GefitMexicoEngineering/GME_Comprobantes/${anticipoID}`, '_blank');
+    console.error('Error abriendo archivo:', e);
+    toast('❌ Error: '+e.message);
   }
 }
 
