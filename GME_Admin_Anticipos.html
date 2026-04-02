@@ -898,10 +898,11 @@ function detailHtml(a){
   const j=a.justificacion;
   let gastosHtml="";
   if(j&&j.gastos&&j.gastos.length){
+    const folderUrl = `https://gefit.sharepoint.com/sites/GefitMexicoEngineering/GME_Comprobantes/${j.anticipoID}`;
     gastosHtml=`<table class="gastos-mini"><thead><tr><th>Categoría</th><th>Descripción</th><th>Tipo</th><th>Serie/Número</th><th style="text-align:right">Monto</th><th>Archivo</th></tr></thead>
-    <tbody>${j.gastos.map(g=>{
+    <tbody>${j.gastos.map((g,i)=>{
       const fileUrl = g.archivo
-        ? `https://gefit.sharepoint.com/sites/GefitMexicoEngineering/_layouts/15/download.aspx?SourceUrl=/sites/GefitMexicoEngineering/GME_Comprobantes/${j.anticipoID}/${encodeURIComponent(g.archivo)}`
+        ? `${folderUrl}/${encodeURIComponent(g.archivo)}`
         : null;
       return `<tr>
         <td>${g.categoria}</td>
@@ -909,9 +910,12 @@ function detailHtml(a){
         <td>${g.tipo}</td>
         <td style="font-size:11px;color:#888">${g.tipo==='Factura'&&(g.serie||g.numero)?(g.serie?g.serie+' ':'')+(g.numero||''):'—'}</td>
         <td style="text-align:right">${fmtMXN(g.monto)}</td>
-        <td>${fileUrl?`<a href="${fileUrl}" target="_blank" style="color:var(--blue-d);font-size:11px;text-decoration:none" title="Abrir en SharePoint">📎 ${g.archivo}</a>`:'<span style="color:#bbb;font-size:11px">—</span>'}</td>
+        <td>${g.archivo?`<a href="javascript:void(0)" onclick="abrirComprobante('${j.anticipoID}','${g.archivo}',event)" style="color:var(--blue-d);font-size:11px;text-decoration:none" title="Abrir comprobante">📎 ${g.archivo}</a>`:'<span style="color:#bbb;font-size:11px">—</span>'}</td>
       </tr>`;
-    }).join("")}</tbody></table>`;
+    }).join("")}</tbody></table>
+    <div style="margin-top:8px;font-size:11px;color:#aaa">
+      <a href="${folderUrl}" target="_blank" style="color:var(--blue-d);text-decoration:none">📁 Ver todos los archivos en SharePoint</a>
+    </div>`;
   }
   const tipoTrasferta = j&&j.tipoTrasferta ? j.tipoTrasferta : null;
   const tipoChip = tipoTrasferta ? `<div class="detail-item"><div class="dl">Tipo trasferta</div><div class="dv">${tipoTrasferta==='Internacional'?'✈️ Internacional':'🇲🇽 Nacional'}</div></div>` : '';
@@ -1248,6 +1252,39 @@ function histLimpiar(){
   document.getElementById("hist-resultado").style.display="none";
   document.getElementById("hist-resumen").style.display="none";
   histRowCounter=0;
+}
+
+async function abrirComprobante(anticipoID, archivoNombre, evt){
+  evt&&evt.stopPropagation();
+  const token = await getToken();
+  if(!token){ 
+    // Fallback: apri la cartella SharePoint
+    window.open(`https://gefit.sharepoint.com/sites/GefitMexicoEngineering/GME_Comprobantes/${anticipoID}`, '_blank');
+    return;
+  }
+  try {
+    // Cerca i file nella cartella
+    const r = await fetch(
+      `${SP_URL}/_api/web/GetFolderByServerRelativeUrl('/sites/GefitMexicoEngineering/GME_Comprobantes/${anticipoID}')/Files`,
+      { headers:{ 'Accept':'application/json;odata=nometadata', 'Authorization':'Bearer '+token } }
+    );
+    if(!r.ok) throw new Error('Cartella non trovata');
+    const data = await r.json();
+    const files = data.value || [];
+    // Cerca per nome esatto o per nome normalizzato (senza estensione)
+    const nomeSenzaExt = archivoNombre.replace(/\.[^.]+$/, '').toLowerCase();
+    let match = files.find(f => f.Name === archivoNombre);
+    if(!match) match = files.find(f => f.Name.replace(/\.[^.]+$/, '').toLowerCase().includes(nomeSenzaExt.substring(0,8)));
+    if(match){
+      window.open(`https://gefit.sharepoint.com/sites/GefitMexicoEngineering/GME_Comprobantes/${anticipoID}/${encodeURIComponent(match.Name)}`, '_blank');
+    } else {
+      // Apri la cartella se non trovato
+      window.open(`https://gefit.sharepoint.com/sites/GefitMexicoEngineering/GME_Comprobantes/${anticipoID}`, '_blank');
+      toast('⚠️ Archivo no encontrado — abriendo carpeta');
+    }
+  } catch(e){
+    window.open(`https://gefit.sharepoint.com/sites/GefitMexicoEngineering/GME_Comprobantes/${anticipoID}`, '_blank');
+  }
 }
 
 // ── PAQUETE CONTABLE ───────────────────────────────────────────────────────────
