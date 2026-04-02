@@ -883,8 +883,19 @@ async function enviarJustificacion(){
     if(!ok)return;
   }
 
+  // Prevenir doble envío
+  if(sessionStorage.getItem('gme_enviando')){
+    alert('⚠️ Ya se está enviando la justificación. Por favor espera.');
+    return;
+  }
+  if(sessionStorage.getItem('gme_enviado_'+d.anticipoID)){
+    const ok = confirm('⚠️ Esta justificación ya fue enviada anteriormente. ¿Deseas enviarla de nuevo?');
+    if(!ok) return;
+  }
+
   const btn = document.getElementById('btn-enviar');
   if(btn){btn.disabled=true;btn.textContent='Enviando...';}
+  sessionStorage.setItem('gme_enviando','1');
 
   let spOk = false;
   let archivosSubidos = [];
@@ -936,6 +947,8 @@ async function enviarJustificacion(){
   localStorage.setItem('gme_hist', JSON.stringify(hist));
   localStorage.setItem('gme_last', JSON.stringify(d));
 
+  sessionStorage.removeItem('gme_enviando');
+  if(spOk) sessionStorage.setItem('gme_enviado_'+d.anticipoID,'1');
   if(btn){btn.disabled=false;btn.innerHTML='Enviar justificacion';}
 
   let msg;
