@@ -901,7 +901,7 @@ function detailHtml(a){
     gastosHtml=`<table class="gastos-mini"><thead><tr><th>Categoría</th><th>Descripción</th><th>Tipo</th><th>Serie/Número</th><th style="text-align:right">Monto</th><th>Archivo</th></tr></thead>
     <tbody>${j.gastos.map(g=>{
       const fileUrl = g.archivo
-        ? `https://gefit.sharepoint.com/sites/GefitMexicoEngineering/GME_Comprobantes/${j.anticipoID}/${encodeURIComponent(g.archivo)}`
+        ? `https://gefit.sharepoint.com/sites/GefitMexicoEngineering/_layouts/15/download.aspx?SourceUrl=/sites/GefitMexicoEngineering/GME_Comprobantes/${j.anticipoID}/${encodeURIComponent(g.archivo)}`
         : null;
       return `<tr>
         <td>${g.categoria}</td>
