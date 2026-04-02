@@ -727,10 +727,12 @@ function recopilarDatos(){
       });
     });
   });
-  const totalGastado = gastos.reduce((s,g)=>s+g.monto,0);
+  // Filtra righe con monto zero o senza descrizione
+  const gastosFiltrados = gastos.filter(g => g.monto > 0);
+  const totalGastado = gastosFiltrados.reduce((s,g)=>s+g.monto,0);
   const totalFactura = isNacional
-    ? gastos.filter(g=>g.tipo==='Factura' && g.archivo).reduce((s,g)=>s+g.monto,0)
-    : totalGastado; // internacional: tutto conta
+    ? gastosFiltrados.filter(g=>g.tipo==='Factura' && g.archivo).reduce((s,g)=>s+g.monto,0)
+    : totalGastado;
   const pct = totalGastado>0 ? Math.round((totalFactura/totalGastado)*100) : 0;
   const estadoOk = isNacional ? pct>=70 : true;
   return {
@@ -747,7 +749,7 @@ function recopilarDatos(){
     notas:  document.getElementById('notas-generales').value,
     firma:  document.getElementById('firma-nombre').value,
     fechaEnvio: document.getElementById('firma-fecha').value,
-    gastos,
+    gastos: gastosFiltrados,
     timestamp: new Date().toISOString(),
   };
 }
