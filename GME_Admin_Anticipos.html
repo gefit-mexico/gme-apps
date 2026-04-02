@@ -249,6 +249,17 @@ body{font-family:"DM Sans",sans-serif;background:#eef3f8;color:var(--gray);min-h
           <label>Notas / instrucciones al empleado</label>
           <textarea id="ant-notas" placeholder="Indicaciones especiales, límites de gasto, etc."></textarea>
         </div>
+        <div class="form-group form-full">
+          <label>Recibo SPEI / Comprobante de transferencia (opcional)</label>
+          <label style="display:flex;align-items:center;gap:12px;cursor:pointer;border:1.5px dashed var(--blue-mid);border-radius:8px;padding:12px 16px;background:var(--gray-l);transition:all .15s" id="spei-label-ant">
+            <span style="font-size:22px">🏦</span>
+            <div style="flex:1">
+              <div style="font-size:13px;font-weight:600;color:var(--blue-d)" id="spei-ant-name">Seleccionar PDF BanRegio / SPEI</div>
+              <div style="font-size:11px;color:#aaa">Se guardará en GME_Comprobantes junto con los comprobantes del empleado</div>
+            </div>
+            <input type="file" id="spei-ant-file" accept=".pdf,.jpg,.jpeg,.png" style="display:none" onchange="onSpeiAntChange()">
+          </label>
+        </div>
       </div>
 
       <div class="btn-row">
@@ -727,6 +738,17 @@ function renderStats(){
 }
 
 // ── GENERAR ANTICIPO ───────────────────────────────────────────────────────────
+function onSpeiAntChange(){
+  const f = document.getElementById('spei-ant-file').files[0];
+  const label = document.getElementById('spei-label-ant');
+  const nameEl = document.getElementById('spei-ant-name');
+  if(f){
+    nameEl.textContent = '✅ '+f.name;
+    label.style.borderColor = 'var(--green)';
+    label.style.background = 'var(--green-l)';
+  }
+}
+
 async function generarAnticipo(){
   if(!selectedEmpId){toast("⚠️ Selecciona un empleado primero"); return;}
   const proy  = document.getElementById("ant-proyecto").value.trim();
@@ -777,6 +799,21 @@ async function generarAnticipo(){
   anticipos.unshift(ant);
   localStorage.setItem("gme_anticipos", JSON.stringify(anticipos));
 
+  // Sube recibo SPEI si adjuntado
+  const speiFile = document.getElementById('spei-ant-file').files[0];
+  if(speiFile && spOk){
+    try {
+      const token = await getToken();
+      if(token){
+        const ext = speiFile.name.split('.').pop();
+        const speiName = `SPEI_${id}.${ext}`;
+        const buf = await speiFile.arrayBuffer();
+        await uploadComprobante(token, id, speiName, buf);
+        toast("🏦 Recibo SPEI subido a GME_Comprobantes");
+      }
+    } catch(e){ console.warn("Error subiendo SPEI:", e); }
+  }
+
   document.getElementById("res-id").textContent    = id;
   document.getElementById("res-emp").textContent   = emp.nombre;
   document.getElementById("res-proy").textContent  = proy;
@@ -817,6 +854,12 @@ function limpiarForm(){
   ["ant-proyecto","ant-monto","ant-destino","ant-notas"].forEach(id=>{const el=document.getElementById(id);if(el)el.value="";});
   document.getElementById("ant-fecha").value=new Date().toISOString().split("T")[0];
   document.getElementById("resultado").style.display="none";
+  const speiFile = document.getElementById('spei-ant-file');
+  if(speiFile) speiFile.value='';
+  const speiName = document.getElementById('spei-ant-name');
+  if(speiName) speiName.textContent='Seleccionar PDF BanRegio / SPEI';
+  const speiLabel = document.getElementById('spei-label-ant');
+  if(speiLabel){ speiLabel.style.borderColor=''; speiLabel.style.background=''; }
 }
 
 // ── TABLA ──────────────────────────────────────────────────────────────────────
@@ -1210,6 +1253,24 @@ function histLimpiar(){
 // ── PAQUETE CONTABLE ───────────────────────────────────────────────────────────
 const LIB_COMPROBANTES = 'GME_Comprobantes';
 let paqueteAnticipo = null;
+
+async function uploadComprobante(token, anticipoID, fileName, fileData){
+  // Crea cartella
+  try {
+    await fetch(`${SP_URL}/_api/web/folders`, {
+      method:'POST',
+      headers:{'Accept':'application/json;odata=nometadata','Content-Type':'application/json;odata=nometadata','Authorization':'Bearer '+token},
+      body: JSON.stringify({ServerRelativeUrl:`/sites/GefitMexicoEngineering/${LIB_COMPROBANTES}/${anticipoID}`})
+    });
+  } catch(e){}
+  // Upload
+  const safeName = fileName.replace(/[#%&*:<>?/\\|]/g,'_');
+  const r = await fetch(
+    `${SP_URL}/_api/web/GetFolderByServerRelativeUrl('/sites/GefitMexicoEngineering/${LIB_COMPROBANTES}/${anticipoID}')/Files/add(url='${encodeURIComponent(safeName)}',overwrite=true)`,
+    { method:'POST', headers:{'Accept':'application/json;odata=nometadata','Authorization':'Bearer '+token}, body: fileData }
+  );
+  return r.ok;
+}
 
 function abrirModalPaquete(id, evt){
   evt&&evt.stopPropagation();
