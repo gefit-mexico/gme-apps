@@ -1436,13 +1436,31 @@ async function generarPaqueteContable(){
     const xlsxData = generarExcelContable(ant);
     folder.file(`Rendiconto_${ant.id}.xlsx`, xlsxData);
 
-    // 2. Recibo SPEI
+    // 2. Recibo SPEI - prima da file allegato, poi cerca in SharePoint
     const speiFile = document.getElementById('spei-file').files[0];
     if(speiFile){
       setProgress('Agregando recibo SPEI...', 20);
       const speiData = await speiFile.arrayBuffer();
       const speiExt = speiFile.name.split('.').pop();
       folder.file(`SPEI_${ant.id}.${speiExt}`, speiData);
+    } else {
+      // Cerca il SPEI già caricato in SharePoint
+      setProgress('Buscando recibo SPEI en SharePoint...', 20);
+      const token = await getToken();
+      if(token){
+        try {
+          const speiData = await descargarArchivoSP(token, ant.id, `SPEI_${ant.id}.pdf`);
+          if(speiData) folder.file(`SPEI_${ant.id}.pdf`, speiData);
+        } catch(e){
+          // Prova con altri formati
+          for(const ext of ['jpg','jpeg','png']){
+            try {
+              const speiData = await descargarArchivoSP(token, ant.id, `SPEI_${ant.id}.${ext}`);
+              if(speiData){ folder.file(`SPEI_${ant.id}.${ext}`, speiData); break; }
+            } catch(e2){}
+          }
+        }
+      }
     }
 
     // 3. Comprobantes desde SharePoint
