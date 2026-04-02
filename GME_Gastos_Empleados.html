@@ -555,24 +555,34 @@ function onTipoChange(sel, rid){
 
 function onTipoTrasfertaChange(){
   const isNacional = document.getElementById('traf-nacional').checked;
-  // Update all existing rows - add/remove Factura option
   document.querySelectorAll('.expense-row').forEach(tr=>{
     const sel = tr.querySelector('.f-tipo');
     if(!sel) return;
     const currentVal = sel.value;
     const hasFactura = Array.from(sel.options).some(o=>o.value==='Factura');
-    if(isNacional && !hasFactura){
-      const opt = document.createElement('option');
-      opt.value='Factura'; opt.textContent='🧾 Factura';
-      sel.insertBefore(opt, sel.firstChild);
-    } else if(!isNacional && hasFactura){
-      Array.from(sel.options).filter(o=>o.value==='Factura').forEach(o=>o.remove());
-      if(sel.value==='Factura') sel.value='Foto ticket';
+    const hasPropina = Array.from(sel.options).some(o=>o.value==='Propina');
+    const hasFoto = Array.from(sel.options).some(o=>o.value==='Foto ticket');
+    const hasSin = Array.from(sel.options).some(o=>o.value==='Sin comprobante');
+
+    // Ricostruisce il dropdown completo
+    sel.innerHTML = '';
+    if(isNacional){
+      sel.innerHTML += '<option value="Factura">🧾 Factura</option>';
     }
+    sel.innerHTML += '<option value="Foto ticket">📷 Foto ticket</option>';
+    sel.innerHTML += '<option value="Propina">🤝 Propina</option>';
+    sel.innerHTML += '<option value="Sin comprobante">❌ Sin comprobante</option>';
+
+    // Ripristina il valore precedente se ancora valido
+    if(Array.from(sel.options).some(o=>o.value===currentVal)){
+      sel.value = currentVal;
+    } else {
+      sel.value = isNacional ? 'Factura' : 'Foto ticket';
+    }
+
     const rid = tr.dataset.rid;
     if(rid) onTipoChange(sel, rid);
   });
-  // Update progress bar and alert
   recalc();
   updateAlertBar();
 }
