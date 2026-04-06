@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GME — Solicitud de Ausencia</title>
+<script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+
+  :root {
+    --bg: #F5F4F0;
+    --surface: #FFFFFF;
+    --border: #E2E0D8;
+    --text: #1A1916;
+    --text-muted: #7A7870;
+    --accent: #1A3C5E;
+    --accent-light: #EAF1F8;
+    --success: #1D6B45;
+    --success-bg: #E8F5EE;
+    --error: #8B2020;
+    --error-bg: #FAEAEA;
+    --warning: #7A4F00;
+    --warning-bg: #FFF4DC;
+    --radius: 10px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* HEADER */
+  header {
+    background: var(--accent);
+    color: #fff;
+    padding: 0 2rem;
+    height: 58px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .header-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .logo-mark {
+    width: 32px; height: 32px;
+    background: rgba(255,255,255,0.15);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: -0.5px;
+  }
+  .header-title { font-size: 15px; font-weight: 500; opacity: 0.95; }
+  .header-sub { font-size: 12px; opacity: 0.55; }
+
+  #user-info {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 13px; opacity: 0.85;
+  }
+  #avatar {
+    width: 30px; height: 30px; border-radius: 50%;
+    background: rgba(255,255,255,0.2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 600;
+  }
+  #btn-logout {
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.2);
+    color: #fff;
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 12px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.15s;
+  }
+  #btn-logout:hover { background: rgba(255,255,255,0.2); }
+
+  /* LOGIN SCREEN */
+  #login-screen {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+  }
+  .login-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 2.5rem 2rem;
+    max-width: 380px;
+    width: 100%;
+    text-align: center;
+    box-shadow: var(--shadow);
+  }
+  .login-icon {
+    width: 56px; height: 56px;
+    background: var(--accent-light);
+    border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 1.25rem;
+    font-size: 26px;
+  }
+  .login-card h2 { font-size: 20px; font-weight: 600; margin-bottom: 6px; }
+  .login-card p { font-size: 14px; color: var(--text-muted); margin-bottom: 1.75rem; line-height: 1.5; }
+  #btn-login {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius);
+    padding: 12px 28px;
+    font-size: 14px;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    width: 100%;
+    transition: opacity 0.15s;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  #btn-login:hover { opacity: 0.88; }
+
+  /* MAIN */
+  main { flex: 1; padding: 2rem; max-width: 680px; margin: 0 auto; width: 100%; }
+
+  .page-heading {
+    margin-bottom: 1.5rem;
+  }
+  .page-heading h1 { font-size: 22px; font-weight: 600; margin-bottom: 4px; }
+  .page-heading p { font-size: 14px; color: var(--text-muted); }
+
+  /* CARDS */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    box-shadow: var(--shadow);
+  }
+  .card-title {
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    margin-bottom: 1rem;
+  }
+
+  /* TIPO SELECTOR */
+  .tipo-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+  .tipo-btn {
+    border: 1.5px solid var(--border);
+    background: var(--bg);
+    border-radius: var(--radius);
+    padding: 12px 8px;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.15s;
+    font-family: inherit;
+  }
+  .tipo-btn .tipo-icon { font-size: 22px; display: block; margin-bottom: 6px; }
+  .tipo-btn .tipo-label { font-size: 12px; font-weight: 500; color: var(--text-muted); }
+  .tipo-btn:hover { border-color: var(--accent); background: var(--accent-light); }
+  .tipo-btn.active {
+    border-color: var(--accent);
+    background: var(--accent-light);
+    box-shadow: 0 0 0 3px rgba(26,60,94,0.08);
+  }
+  .tipo-btn.active .tipo-label { color: var(--accent); }
+
+  /* FORM FIELDS */
+  .field { margin-bottom: 1rem; }
+  .field:last-child { margin-bottom: 0; }
+  label {
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+    margin-bottom: 6px;
+    color: var(--text);
+  }
+  label .req { color: #C84B31; margin-left: 2px; }
+  input[type="date"], input[type="text"], select, textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 14px;
+    font-family: inherit;
+    background: var(--bg);
+    color: var(--text);
+    transition: border-color 0.15s, box-shadow 0.15s;
+    outline: none;
+  }
+  input[type="date"]:focus, input[type="text"]:focus, select:focus, textarea:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(26,60,94,0.08);
+    background: #fff;
+  }
+  textarea { resize: vertical; min-height: 80px; line-height: 1.5; }
+
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+  .duration-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+    padding: 8px 12px;
+    background: var(--accent-light);
+    border-radius: 8px;
+    font-size: 13px;
+    color: var(--accent);
+    font-weight: 500;
+  }
+
+  /* MEDIO DIA TOGGLE */
+  .toggle-row {
+    display: flex; align-items: center; gap: 10px;
+    margin-top: 8px;
+  }
+  .toggle {
+    position: relative; width: 36px; height: 20px;
+    cursor: pointer;
+  }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle-track {
+    position: absolute; inset: 0;
+    background: var(--border);
+    border-radius: 10px;
+    transition: background 0.2s;
+  }
+  .toggle input:checked + .toggle-track { background: var(--accent); }
+  .toggle-thumb {
+    position: absolute;
+    top: 2px; left: 2px;
+    width: 16px; height: 16px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform 0.2s;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  }
+  .toggle input:checked ~ .toggle-thumb { transform: translateX(16px); }
+  .toggle-label { font-size: 13px; color: var(--text-muted); }
+
+  /* SUBMIT */
+  #btn-submit {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius);
+    padding: 13px 24px;
+    font-size: 15px;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    width: 100%;
+    transition: opacity 0.15s;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  #btn-submit:hover:not(:disabled) { opacity: 0.88; }
+  #btn-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* ALERTS */
+  .alert {
+    padding: 12px 14px;
+    border-radius: var(--radius);
+    font-size: 13px;
+    line-height: 1.5;
+    display: flex; align-items: flex-start; gap: 8px;
+    margin-bottom: 1rem;
+  }
+  .alert-success { background: var(--success-bg); color: var(--success); border: 1px solid #B8DFC9; }
+  .alert-error { background: var(--error-bg); color: var(--error); border: 1px solid #EFBBBB; }
+  .alert-warning { background: var(--warning-bg); color: var(--warning); border: 1px solid #F0D8A0; }
+
+  /* MIS SOLICITUDES */
+  .solicitud-item {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--bg);
+  }
+  .sol-icon { font-size: 20px; flex-shrink: 0; }
+  .sol-info { flex: 1; }
+  .sol-tipo { font-size: 13px; font-weight: 600; }
+  .sol-fechas { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+  .sol-badge {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 9px;
+    border-radius: 20px;
+    white-space: nowrap;
+  }
+  .badge-pendiente { background: var(--warning-bg); color: var(--warning); }
+  .badge-aprobada { background: var(--success-bg); color: var(--success); }
+  .badge-rechazada { background: var(--error-bg); color: var(--error); }
+
+  .empty-state {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-muted);
+    font-size: 13px;
+  }
+
+  /* SPINNER */
+  .spinner {
+    width: 16px; height: 16px;
+    border: 2px solid rgba(255,255,255,0.4);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  #app-screen { display: none; }
+
+  @media (max-width: 480px) {
+    main { padding: 1rem; }
+    .tipo-grid { grid-template-columns: repeat(3, 1fr); }
+    .field-row { grid-template-columns: 1fr; }
+    header { padding: 0 1rem; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-brand">
+    <div class="logo-mark">GME</div>
+    <div>
+      <div class="header-title">GEFIT Mexico Engineering</div>
+      <div class="header-sub">Portal de Ausencias</div>
+    </div>
+  </div>
+  <div id="user-info" style="display:none">
+    <div id="avatar">--</div>
+    <span id="user-name"></span>
+    <button id="btn-logout">Salir</button>
+  </div>
+</header>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-icon">🗓️</div>
+    <h2>Portal de Ausencias</h2>
+    <p>Solicita tus vacaciones, permisos o incapacidades.<br>Inicia sesión con tu cuenta GME.</p>
+    <button id="btn-login">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      Iniciar sesión con Microsoft
+    </button>
+    <div id="login-error" style="margin-top:1rem"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app-screen">
+  <main>
+    <div class="page-heading">
+      <h1>Nueva solicitud</h1>
+      <p>Completa el formulario y tu solicitud llegará al administrador.</p>
+    </div>
+
+    <div id="alert-area"></div>
+
+    <!-- TIPO -->
+    <div class="card">
+      <div class="card-title">Tipo de ausencia</div>
+      <div class="tipo-grid">
+        <button class="tipo-btn active" data-tipo="Vacaciones" onclick="selTipo(this)">
+          <span class="tipo-icon">🏖️</span>
+          <span class="tipo-label">Vacaciones</span>
+        </button>
+        <button class="tipo-btn" data-tipo="Permiso Personal" onclick="selTipo(this)">
+          <span class="tipo-icon">🙋</span>
+          <span class="tipo-label">Permiso personal</span>
+        </button>
+        <button class="tipo-btn" data-tipo="Incapacidad" onclick="selTipo(this)">
+          <span class="tipo-icon">🏥</span>
+          <span class="tipo-label">Incapacidad</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- FECHAS -->
+    <div class="card">
+      <div class="card-title">Fechas</div>
+
+      <div id="medio-dia-row" style="display:none; margin-bottom:1rem;">
+        <div class="toggle-row">
+          <label class="toggle">
+            <input type="checkbox" id="chk-medio-dia" onchange="toggleMedioDia()">
+            <div class="toggle-track"></div>
+            <div class="toggle-thumb"></div>
+          </label>
+          <span class="toggle-label">Medio día únicamente</span>
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label>Fecha inicio <span class="req">*</span></label>
+          <input type="date" id="fecha-inicio" onchange="calcDuracion()">
+        </div>
+        <div class="field" id="fecha-fin-wrap">
+          <label>Fecha fin <span class="req">*</span></label>
+          <input type="date" id="fecha-fin" onchange="calcDuracion()">
+        </div>
+      </div>
+
+      <div id="duracion-info" style="display:none" class="duration-info">
+        <span>📅</span>
+        <span id="duracion-text"></span>
+      </div>
+    </div>
+
+    <!-- DETALLES -->
+    <div class="card">
+      <div class="card-title">Detalles adicionales</div>
+      <div class="field">
+        <label>Motivo / Comentarios</label>
+        <textarea id="motivo" placeholder="Opcional — describe el motivo o agrega información relevante..."></textarea>
+      </div>
+      <div class="field" id="doc-field" style="display:none">
+        <label>Número de folio IMSS / Referencia médica</label>
+        <input type="text" id="doc-ref" placeholder="Ej. 12345678">
+      </div>
+    </div>
+
+    <button id="btn-submit" onclick="enviarSolicitud()">
+      <span id="btn-text">Enviar solicitud</span>
+    </button>
+
+    <!-- MIS SOLICITUDES -->
+    <div class="card" style="margin-top:1.5rem">
+      <div class="card-title">Mis solicitudes recientes</div>
+      <div id="mis-solicitudes">
+        <div class="empty-state">Cargando...</div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+// ─────────────────────────────────────────────
+//  CONFIGURACIÓN — ajustar antes de desplegar
+// ─────────────────────────────────────────────
+const CONFIG = {
+  clientId:     "1581f9ad-82e6-494e-810b-f8c18271ce4c",
+  tenantId:     "5e9917fe-df22-4e96-a361-9e14199c0a13",
+  siteUrl:      "https://gefit.sharepoint.com/sites/GefitMexicoEngineering",
+  listName:     "GME_Solicitudes",
+  teamsWebhook: "https://gefit.webhook.office.com/webhookb2/366303f8-9cec-4711-965b-6e8e262d8bc8@5e9917fe-df22-4e96-a361-9e14199c0a13/IncomingWebhook/a2b648a79b314c6cbe501759ded7e104/831e1f38-334b-4a6a-885f-3affac7ebfef/V2ac-KMCwyUcANeBR2v4bOvhf-hTFF19Wv3UbJUEg0zfs1",
+  redirectUri:  window.location.origin + window.location.pathname
+};
+
+const SCOPES = ["https://graph.microsoft.com/Sites.ReadWrite.All"];
+
+// MSAL
+const msalApp = new msal.PublicClientApplication({
+  auth: {
+    clientId:    CONFIG.clientId,
+    authority:   `https://login.microsoftonline.com/${CONFIG.tenantId}`,
+    redirectUri: CONFIG.redirectUri
+  },
+  cache: { cacheLocation: "sessionStorage" }
+});
+
+let currentUser = null;
+let accessToken = null;
+let tipoSeleccionado = "Vacaciones";
+
+// ─────────────────────────────────────────────
+//  AUTH
+// ─────────────────────────────────────────────
+async function init() {
+  try {
+    const resp = await msalApp.handleRedirectPromise();
+    if (resp) {
+      accessToken = resp.accessToken;
+      currentUser = resp.account;
+      msalApp.setActiveAccount(currentUser);
+      mostrarApp();
+    } else {
+      const accounts = msalApp.getAllAccounts();
+      if (accounts.length > 0) {
+        currentUser = accounts[0];
+        msalApp.setActiveAccount(currentUser);
+        await getToken();
+        mostrarApp();
+      }
+    }
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+async function getToken() {
+  try {
+    const r = await msalApp.acquireTokenSilent({ scopes: SCOPES, account: currentUser });
+    accessToken = r.accessToken;
+  } catch {
+    await msalApp.acquireTokenRedirect({ scopes: SCOPES });
+  }
+}
+
+function login() {
+  msalApp.loginRedirect({ scopes: SCOPES });
+}
+
+function logout() {
+  msalApp.logoutRedirect();
+}
+
+function mostrarApp() {
+  document.getElementById("login-screen").style.display = "none";
+  document.getElementById("app-screen").style.display = "block";
+  document.getElementById("user-info").style.display = "flex";
+
+  const nombre = currentUser.name || currentUser.username;
+  const iniciales = nombre.split(" ").slice(0,2).map(n=>n[0]).join("").toUpperCase();
+  document.getElementById("user-name").textContent = nombre.split(" ")[0];
+  document.getElementById("avatar").textContent = iniciales;
+
+  cargarMisSolicitudes();
+}
+
+// ─────────────────────────────────────────────
+//  UI HELPERS
+// ─────────────────────────────────────────────
+function selTipo(btn) {
+  document.querySelectorAll(".tipo-btn").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  tipoSeleccionado = btn.dataset.tipo;
+
+  const medioDiaRow = document.getElementById("medio-dia-row");
+  const docField    = document.getElementById("doc-field");
+  const chk         = document.getElementById("chk-medio-dia");
+
+  medioDiaRow.style.display = tipoSeleccionado === "Permiso Personal" ? "block" : "none";
+  docField.style.display    = tipoSeleccionado === "Incapacidad" ? "block" : "none";
+
+  if (tipoSeleccionado !== "Permiso Personal") {
+    chk.checked = false;
+    toggleMedioDia();
+  }
+  calcDuracion();
+}
+
+function toggleMedioDia() {
+  const chk = document.getElementById("chk-medio-dia").checked;
+  document.getElementById("fecha-fin-wrap").style.display = chk ? "none" : "block";
+  if (chk) document.getElementById("fecha-fin").value = "";
+  calcDuracion();
+}
+
+function calcDuracion() {
+  const inicio = document.getElementById("fecha-inicio").value;
+  const fin    = document.getElementById("fecha-fin").value;
+  const chk    = document.getElementById("chk-medio-dia").checked;
+  const info   = document.getElementById("duracion-info");
+  const txt    = document.getElementById("duracion-text");
+
+  if (chk && inicio) {
+    info.style.display = "flex";
+    txt.textContent = "Medio día — " + formatFecha(inicio);
+    return;
+  }
+  if (!inicio || !fin) { info.style.display = "none"; return; }
+
+  const d1 = new Date(inicio + "T00:00:00");
+  const d2 = new Date(fin + "T00:00:00");
+  if (d2 < d1) { info.style.display = "none"; return; }
+
+  const dias = Math.round((d2 - d1) / 86400000) + 1;
+  info.style.display = "flex";
+  txt.textContent = `${dias} día${dias > 1 ? "s" : ""} — del ${formatFecha(inicio)} al ${formatFecha(fin)}`;
+}
+
+function formatFecha(str) {
+  const [y,m,d] = str.split("-");
+  return `${d}/${m}/${y}`;
+}
+
+function showAlert(msg, tipo="success") {
+  const el = document.getElementById("alert-area");
+  const icons = { success:"✓", error:"✕", warning:"⚠" };
+  el.innerHTML = `<div class="alert alert-${tipo}"><span>${icons[tipo]}</span><span>${msg}</span></div>`;
+  el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  if (tipo === "success") setTimeout(() => el.innerHTML = "", 6000);
+}
+
+function setBtnLoading(loading) {
+  const btn  = document.getElementById("btn-submit");
+  const text = document.getElementById("btn-text");
+  if (loading) {
+    btn.disabled = true;
+    btn.innerHTML = '<div class="spinner"></div><span>Enviando...</span>';
+  } else {
+    btn.disabled = false;
+    btn.innerHTML = '<span id="btn-text">Enviar solicitud</span>';
+  }
+}
+
+// ─────────────────────────────────────────────
+//  SHAREPOINT
+// ─────────────────────────────────────────────
+async function spRequest(method, endpoint, body = null) {
+  await getToken();
+  const url = `https://graph.microsoft.com/v1.0/sites/${getSiteId()}/lists/${CONFIG.listName}/items`;
+  const opts = {
+    method,
+    headers: {
+      "Authorization": `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+      "Accept": "application/json"
+    }
+  };
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch(endpoint || url, opts);
+  if (!r.ok) throw new Error(`SP error ${r.status}: ${await r.text()}`);
+  return r.json();
+}
+
+// Usamos Graph API con site path
+function graphBase() {
+  return `https://graph.microsoft.com/v1.0/sites/gefit.sharepoint.com:/sites/GefitMexicoEngineering:/lists/${CONFIG.listName}`;
+}
+
+async function crearItemSP(fields) {
+  await getToken();
+  const r = await fetch(`${graphBase()}/items`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${accessToken}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ fields })
+  });
+  if (!r.ok) throw new Error(`Error ${r.status}: ${await r.text()}`);
+  return r.json();
+}
+
+async function obtenerMisSolicitudes() {
+  await getToken();
+  const email = currentUser.username;
+  const url = `${graphBase()}/items?$filter=fields/EmailSolicitante eq '${email}'&$orderby=fields/Created desc&$top=10&$expand=fields`;
+  const r = await fetch(url, {
+    headers: { "Authorization": `Bearer ${accessToken}`, "Accept": "application/json" }
+  });
+  if (!r.ok) return [];
+  const data = await r.json();
+  return data.value || [];
+}
+
+// ─────────────────────────────────────────────
+//  TEAMS WEBHOOK
+// ─────────────────────────────────────────────
+async function notificarTeams(solicitud) {
+  if (!CONFIG.teamsWebhook || CONFIG.teamsWebhook === "TU_WEBHOOK_URL") return;
+
+  const iconos = { Vacaciones:"🏖️", "Permiso Personal":"🙋", Incapacidad:"🏥" };
+  const fechas = solicitud.medioDia
+    ? `Medio día — ${solicitud.fechaInicio}`
+    : `${solicitud.fechaInicio}${solicitud.fechaFin !== solicitud.fechaInicio ? " → " + solicitud.fechaFin : ""}`;
+
+  const payload = {
+    "@type": "MessageCard",
+    "@context": "https://schema.org/extensions",
+    "themeColor": "1A3C5E",
+    "summary": `Nueva solicitud de ${solicitud.nombre}`,
+    "sections": [{
+      "activityTitle": `${iconos[solicitud.tipo] || "📋"} Nueva solicitud — ${solicitud.tipo}`,
+      "activitySubtitle": `Enviada por **${solicitud.nombre}**`,
+      "facts": [
+        { "name": "Empleado", "value": solicitud.nombre },
+        { "name": "Email",    "value": solicitud.email },
+        { "name": "Tipo",     "value": solicitud.tipo },
+        { "name": "Fechas",   "value": fechas },
+        { "name": "Motivo",   "value": solicitud.motivo || "—" }
+      ],
+      "markdown": true
+    }],
+    "potentialAction": [{
+      "@type": "OpenUri",
+      "name": "Ver en SharePoint",
+      "targets": [{ "os": "default", "uri": CONFIG.siteUrl }]
+    }]
+  };
+
+  try {
+    await fetch(CONFIG.teamsWebhook, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+  } catch (e) {
+    console.warn("Webhook Teams no disponible:", e);
+  }
+}
+
+// ─────────────────────────────────────────────
+//  ENVIAR SOLICITUD
+// ─────────────────────────────────────────────
+async function enviarSolicitud() {
+  const inicio  = document.getElementById("fecha-inicio").value;
+  const fin     = document.getElementById("fecha-fin").value;
+  const motivo  = document.getElementById("motivo").value.trim();
+  const docRef  = document.getElementById("doc-ref").value.trim();
+  const medioDia = document.getElementById("chk-medio-dia").checked;
+
+  if (!inicio) { showAlert("Por favor selecciona la fecha de inicio.", "error"); return; }
+  if (!medioDia && !fin) { showAlert("Por favor selecciona la fecha de fin.", "error"); return; }
+  if (!medioDia && fin < inicio) { showAlert("La fecha de fin no puede ser anterior al inicio.", "error"); return; }
+
+  setBtnLoading(true);
+
+  const nombre = currentUser.name || currentUser.username;
+  const email  = currentUser.username;
+  const fechaFin = medioDia ? inicio : fin;
+
+  const fields = {
+    Title:              `${tipoSeleccionado} — ${nombre}`,
+    NombreSolicitante:  nombre,
+    EmailSolicitante:   email,
+    TipoAusencia:       tipoSeleccionado,
+    FechaInicio:        inicio,
+    FechaFin:           fechaFin,
+    MedioDia:           medioDia,
+    Motivo:             motivo,
+    ReferenciaDoc:      docRef,
+    Estado:             "Pendiente"
+  };
+
+  try {
+    await crearItemSP(fields);
+    await notificarTeams({
+      nombre, email,
+      tipo:      tipoSeleccionado,
+      fechaInicio: formatFecha(inicio),
+      fechaFin:    formatFecha(fechaFin),
+      medioDia, motivo
+    });
+
+    showAlert("✓ Solicitud enviada correctamente. El administrador la revisará pronto.", "success");
+
+    // reset form
+    document.getElementById("fecha-inicio").value = "";
+    document.getElementById("fecha-fin").value = "";
+    document.getElementById("motivo").value = "";
+    document.getElementById("doc-ref").value = "";
+    document.getElementById("chk-medio-dia").checked = false;
+    toggleMedioDia();
+    document.getElementById("duracion-info").style.display = "none";
+
+    cargarMisSolicitudes();
+  } catch (e) {
+    console.error(e);
+    showAlert("Error al enviar la solicitud: " + e.message, "error");
+  } finally {
+    setBtnLoading(false);
+  }
+}
+
+// ─────────────────────────────────────────────
+//  MIS SOLICITUDES
+// ─────────────────────────────────────────────
+async function cargarMisSolicitudes() {
+  const cont = document.getElementById("mis-solicitudes");
+  cont.innerHTML = '<div class="empty-state">Cargando...</div>';
+  try {
+    const items = await obtenerMisSolicitudes();
+    if (!items.length) {
+      cont.innerHTML = '<div class="empty-state">No tienes solicitudes registradas.</div>';
+      return;
+    }
+    const iconos  = { Vacaciones:"🏖️", "Permiso Personal":"🙋", Incapacidad:"🏥" };
+    const estados = {
+      Pendiente:  { cls:"badge-pendiente",  label:"Pendiente" },
+      Aprobada:   { cls:"badge-aprobada",   label:"Aprobada"  },
+      Rechazada:  { cls:"badge-rechazada",  label:"Rechazada" }
+    };
+    cont.innerHTML = items.map(it => {
+      const f = it.fields;
+      const estado = estados[f.Estado] || estados.Pendiente;
+      const fechas = f.MedioDia
+        ? `Medio día — ${formatFecha(f.FechaInicio)}`
+        : f.FechaInicio === f.FechaFin
+          ? formatFecha(f.FechaInicio)
+          : `${formatFecha(f.FechaInicio)} → ${formatFecha(f.FechaFin)}`;
+      return `
+        <div class="solicitud-item">
+          <span class="sol-icon">${iconos[f.TipoAusencia] || "📋"}</span>
+          <div class="sol-info">
+            <div class="sol-tipo">${f.TipoAusencia}</div>
+            <div class="sol-fechas">${fechas}${f.Motivo ? " · " + f.Motivo.substring(0,40) : ""}</div>
+          </div>
+          <span class="sol-badge ${estado.cls}">${estado.label}</span>
+        </div>`;
+    }).join("");
+  } catch (e) {
+    cont.innerHTML = '<div class="empty-state">Error al cargar solicitudes.</div>';
+  }
+}
+
+// ─────────────────────────────────────────────
+//  EVENTOS
+// ─────────────────────────────────────────────
+document.getElementById("btn-login").addEventListener("click", login);
+document.getElementById("btn-logout").addEventListener("click", logout);
+
+init();
+</script>
+</body>
+</html>

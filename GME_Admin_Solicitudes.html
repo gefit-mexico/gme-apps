@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GME Admin — Solicitudes de Ausencia</title>
+<script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+
+  :root {
+    --bg: #F5F4F0;
+    --surface: #FFFFFF;
+    --border: #E2E0D8;
+    --text: #1A1916;
+    --text-muted: #7A7870;
+    --accent: #1A3C5E;
+    --accent-light: #EAF1F8;
+    --success: #1D6B45;
+    --success-bg: #E8F5EE;
+    --success-border: #B8DFC9;
+    --error: #8B2020;
+    --error-bg: #FAEAEA;
+    --error-border: #EFBBBB;
+    --warning: #7A4F00;
+    --warning-bg: #FFF4DC;
+    --warning-border: #F0D8A0;
+    --radius: 10px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* HEADER */
+  header {
+    background: var(--accent);
+    color: #fff;
+    padding: 0 2rem;
+    height: 58px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky; top: 0; z-index: 100;
+  }
+  .header-brand { display: flex; align-items: center; gap: 12px; }
+  .logo-mark {
+    width: 32px; height: 32px;
+    background: rgba(255,255,255,0.15);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'DM Mono', monospace;
+    font-size: 13px; font-weight: 500;
+  }
+  .header-title { font-size: 15px; font-weight: 500; opacity: 0.95; }
+  .header-sub { font-size: 12px; opacity: 0.55; }
+  .admin-badge {
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.25);
+    border-radius: 20px;
+    padding: 3px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    margin-left: 8px;
+  }
+  #btn-logout {
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.2);
+    color: #fff; border-radius: 6px;
+    padding: 4px 10px; font-size: 12px;
+    cursor: pointer; font-family: inherit;
+    transition: background 0.15s;
+  }
+  #btn-logout:hover { background: rgba(255,255,255,0.2); }
+
+  /* LOGIN */
+  #login-screen {
+    display: flex; align-items: center; justify-content: center;
+    min-height: calc(100vh - 58px); padding: 2rem;
+  }
+  .login-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 2.5rem 2rem;
+    max-width: 360px; width: 100%;
+    text-align: center;
+    box-shadow: var(--shadow);
+  }
+  .login-icon { font-size: 32px; margin-bottom: 1rem; }
+  .login-card h2 { font-size: 20px; font-weight: 600; margin-bottom: 6px; }
+  .login-card p { font-size: 14px; color: var(--text-muted); margin-bottom: 1.75rem; line-height: 1.5; }
+  #btn-login {
+    background: var(--accent); color: #fff;
+    border: none; border-radius: var(--radius);
+    padding: 12px 24px; font-size: 14px;
+    font-weight: 500; font-family: inherit;
+    cursor: pointer; width: 100%;
+    transition: opacity 0.15s;
+  }
+  #btn-login:hover { opacity: 0.88; }
+
+  /* MAIN */
+  main { max-width: 960px; margin: 0 auto; padding: 2rem; }
+
+  /* STATS */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 1.5rem;
+  }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem;
+    text-align: center;
+    box-shadow: var(--shadow);
+  }
+  .stat-num {
+    font-size: 28px; font-weight: 600;
+    font-family: 'DM Mono', monospace;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+  .stat-label { font-size: 12px; color: var(--text-muted); }
+  .stat-pendiente .stat-num { color: var(--warning); }
+  .stat-aprobada  .stat-num { color: var(--success); }
+  .stat-rechazada .stat-num { color: var(--error); }
+  .stat-total     .stat-num { color: var(--accent); }
+
+  /* FILTERS */
+  .filters {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1rem;
+    display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+    box-shadow: var(--shadow);
+  }
+  .filter-label { font-size: 13px; color: var(--text-muted); font-weight: 500; }
+  .filter-btn {
+    border: 1px solid var(--border);
+    background: var(--bg);
+    border-radius: 20px;
+    padding: 5px 14px;
+    font-size: 12px; font-weight: 500;
+    cursor: pointer; font-family: inherit;
+    color: var(--text-muted);
+    transition: all 0.15s;
+  }
+  .filter-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .filter-search {
+    margin-left: auto;
+    padding: 6px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 13px; font-family: inherit;
+    background: var(--bg); color: var(--text);
+    outline: none; width: 200px;
+    transition: border-color 0.15s;
+  }
+  .filter-search:focus { border-color: var(--accent); background: #fff; }
+
+  /* TABLE */
+  .table-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+  }
+  table { width: 100%; border-collapse: collapse; }
+  thead tr { background: var(--bg); border-bottom: 1px solid var(--border); }
+  th {
+    padding: 10px 14px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+  tbody tr {
+    border-bottom: 1px solid var(--border);
+    transition: background 0.1s;
+  }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: var(--bg); }
+  td {
+    padding: 12px 14px;
+    font-size: 13px;
+    vertical-align: middle;
+  }
+  .emp-name { font-weight: 500; }
+  .emp-email { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+  /* BADGES */
+  .badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 11px; font-weight: 600;
+    padding: 3px 9px; border-radius: 20px;
+    white-space: nowrap;
+  }
+  .badge-pendiente { background: var(--warning-bg); color: var(--warning); border: 1px solid var(--warning-border); }
+  .badge-aprobada  { background: var(--success-bg); color: var(--success);  border: 1px solid var(--success-border); }
+  .badge-rechazada { background: var(--error-bg);   color: var(--error);    border: 1px solid var(--error-border); }
+
+  /* ACTIONS */
+  .action-btns { display: flex; gap: 6px; }
+  .btn-aprobar, .btn-rechazar, .btn-ver {
+    border: none; border-radius: 6px;
+    padding: 5px 11px; font-size: 12px;
+    font-weight: 500; font-family: inherit;
+    cursor: pointer; transition: opacity 0.15s;
+  }
+  .btn-aprobar  { background: var(--success-bg); color: var(--success); border: 1px solid var(--success-border); }
+  .btn-rechazar { background: var(--error-bg);   color: var(--error);   border: 1px solid var(--error-border);   }
+  .btn-ver      { background: var(--bg);         color: var(--text-muted); border: 1px solid var(--border);     }
+  .btn-aprobar:hover  { opacity: 0.75; }
+  .btn-rechazar:hover { opacity: 0.75; }
+  .btn-ver:hover      { opacity: 0.75; }
+
+  /* MODAL */
+  .modal-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.4);
+    z-index: 1000;
+    align-items: center; justify-content: center;
+    padding: 1rem;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--surface);
+    border-radius: 16px;
+    padding: 1.75rem;
+    max-width: 480px; width: 100%;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+  }
+  .modal-title { font-size: 17px; font-weight: 600; margin-bottom: 1.25rem; }
+  .modal-field { margin-bottom: 12px; }
+  .modal-field label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); display: block; margin-bottom: 3px; }
+  .modal-field span { font-size: 14px; }
+  .modal-textarea {
+    width: 100%; padding: 10px 12px;
+    border: 1px solid var(--border); border-radius: 8px;
+    font-size: 14px; font-family: inherit;
+    background: var(--bg); color: var(--text);
+    outline: none; resize: vertical; min-height: 70px;
+    margin-top: 4px;
+  }
+  .modal-textarea:focus { border-color: var(--accent); background: #fff; }
+  .modal-footer { display: flex; gap: 8px; margin-top: 1.25rem; justify-content: flex-end; }
+  .btn-modal-cancel {
+    background: var(--bg); color: var(--text-muted);
+    border: 1px solid var(--border); border-radius: 8px;
+    padding: 9px 18px; font-size: 14px;
+    font-family: inherit; cursor: pointer;
+  }
+  .btn-modal-confirm {
+    border: none; border-radius: 8px;
+    padding: 9px 18px; font-size: 14px;
+    font-weight: 500; font-family: inherit;
+    cursor: pointer; color: #fff;
+    transition: opacity 0.15s;
+  }
+  .btn-modal-confirm.aprobar  { background: var(--success); }
+  .btn-modal-confirm.rechazar { background: var(--error); }
+  .btn-modal-confirm:hover { opacity: 0.85; }
+
+  /* EMPTY / LOADING */
+  .empty-row td { text-align: center; padding: 3rem; color: var(--text-muted); font-size: 14px; }
+
+  /* TOAST */
+  #toast {
+    position: fixed; bottom: 24px; right: 24px;
+    background: var(--text); color: #fff;
+    padding: 12px 18px; border-radius: 10px;
+    font-size: 13px; font-weight: 500;
+    opacity: 0; transform: translateY(8px);
+    transition: all 0.25s; pointer-events: none;
+    z-index: 9999;
+  }
+  #toast.show { opacity: 1; transform: translateY(0); }
+
+  #app-screen { display: none; }
+
+  /* REFRESH BTN */
+  #btn-refresh {
+    background: var(--accent-light); color: var(--accent);
+    border: 1px solid #BDD4EA; border-radius: 8px;
+    padding: 6px 14px; font-size: 13px;
+    font-family: inherit; cursor: pointer;
+    margin-left: auto; font-weight: 500;
+  }
+  #btn-refresh:hover { opacity: 0.8; }
+
+  @media (max-width: 600px) {
+    main { padding: 1rem; }
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    th:nth-child(3), td:nth-child(3) { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-brand">
+    <div class="logo-mark">GME</div>
+    <div>
+      <div class="header-title" style="display:flex;align-items:center;gap:6px">
+        Administración de Ausencias
+        <span class="admin-badge">ADMIN</span>
+      </div>
+      <div class="header-sub">GEFIT Mexico Engineering</div>
+    </div>
+  </div>
+  <button id="btn-logout" style="display:none">Salir</button>
+</header>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-icon">🔐</div>
+    <h2>Acceso administrador</h2>
+    <p>Panel exclusivo para revisar y gestionar las solicitudes de ausencia del equipo GME.</p>
+    <button id="btn-login">Iniciar sesión con Microsoft</button>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app-screen">
+  <main>
+
+    <!-- STATS -->
+    <div class="stats-grid">
+      <div class="stat-card stat-pendiente"><div class="stat-num" id="cnt-pendiente">—</div><div class="stat-label">Pendientes</div></div>
+      <div class="stat-card stat-aprobada"><div class="stat-num" id="cnt-aprobada">—</div><div class="stat-label">Aprobadas</div></div>
+      <div class="stat-card stat-rechazada"><div class="stat-num" id="cnt-rechazada">—</div><div class="stat-label">Rechazadas</div></div>
+      <div class="stat-card stat-total"><div class="stat-num" id="cnt-total">—</div><div class="stat-label">Total</div></div>
+    </div>
+
+    <!-- FILTERS -->
+    <div class="filters">
+      <span class="filter-label">Filtrar:</span>
+      <button class="filter-btn active" data-estado="Todos" onclick="setFiltro(this)">Todos</button>
+      <button class="filter-btn" data-estado="Pendiente" onclick="setFiltro(this)">⏳ Pendiente</button>
+      <button class="filter-btn" data-estado="Aprobada"  onclick="setFiltro(this)">✓ Aprobada</button>
+      <button class="filter-btn" data-estado="Rechazada" onclick="setFiltro(this)">✕ Rechazada</button>
+      <input type="text" class="filter-search" id="filter-search" placeholder="Buscar empleado..." oninput="renderTabla()">
+      <button id="btn-refresh" onclick="cargarSolicitudes()">↻ Actualizar</button>
+    </div>
+
+    <!-- TABLA -->
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Empleado</th>
+            <th>Tipo</th>
+            <th>Fechas</th>
+            <th>Motivo</th>
+            <th>Estado</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="tabla-body">
+          <tr class="empty-row"><td colspan="6">Cargando solicitudes...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<!-- MODAL DETALLE/ACCIÓN -->
+<div class="modal-overlay" id="modal" onclick="cerrarModal(event)">
+  <div class="modal">
+    <div class="modal-title" id="modal-title">Solicitud</div>
+    <div id="modal-body"></div>
+    <div id="modal-comentario-wrap" style="margin-top:1rem">
+      <label style="font-size:13px;font-weight:500;display:block;margin-bottom:6px" id="modal-com-label">Comentario (opcional)</label>
+      <textarea class="modal-textarea" id="modal-comentario" placeholder="Agrega un comentario para el empleado..."></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-modal-cancel" onclick="cerrarModal()">Cancelar</button>
+      <button class="btn-modal-confirm" id="modal-confirm-btn" onclick="confirmarAccion()">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ─────────────────────────────────────────────
+//  CONFIGURACIÓN — igual que en GME_Solicitudes.html
+// ─────────────────────────────────────────────
+const CONFIG = {
+  clientId:     "1581f9ad-82e6-494e-810b-f8c18271ce4c",
+  tenantId:     "5e9917fe-df22-4e96-a361-9e14199c0a13",
+  listName:     "GME_Solicitudes",
+  teamsWebhook: "https://gefit.webhook.office.com/webhookb2/366303f8-9cec-4711-965b-6e8e262d8bc8@5e9917fe-df22-4e96-a361-9e14199c0a13/IncomingWebhook/a2b648a79b314c6cbe501759ded7e104/831e1f38-334b-4a6a-885f-3affac7ebfef/V2ac-KMCwyUcANeBR2v4bOvhf-hTFF19Wv3UbJUEg0zfs1",
+  redirectUri:  window.location.origin + window.location.pathname
+};
+
+const SCOPES = ["https://graph.microsoft.com/Sites.ReadWrite.All"];
+
+const msalApp = new msal.PublicClientApplication({
+  auth: {
+    clientId:    CONFIG.clientId,
+    authority:   `https://login.microsoftonline.com/${CONFIG.tenantId}`,
+    redirectUri: CONFIG.redirectUri
+  },
+  cache: { cacheLocation: "sessionStorage" }
+});
+
+let currentUser = null;
+let accessToken = null;
+let allItems    = [];
+let filtroEstado = "Todos";
+let pendingAction = null; // { id, action }
+
+// ─────────────────────────────────────────────
+//  AUTH
+// ─────────────────────────────────────────────
+async function init() {
+  try {
+    const resp = await msalApp.handleRedirectPromise();
+    if (resp) {
+      accessToken = resp.accessToken;
+      currentUser = resp.account;
+      msalApp.setActiveAccount(currentUser);
+      mostrarApp();
+    } else {
+      const accounts = msalApp.getAllAccounts();
+      if (accounts.length > 0) {
+        currentUser = accounts[0];
+        msalApp.setActiveAccount(currentUser);
+        await getToken();
+        mostrarApp();
+      }
+    }
+  } catch (e) { console.error(e); }
+}
+
+async function getToken() {
+  try {
+    const r = await msalApp.acquireTokenSilent({ scopes: SCOPES, account: currentUser });
+    accessToken = r.accessToken;
+  } catch { await msalApp.acquireTokenRedirect({ scopes: SCOPES }); }
+}
+
+function mostrarApp() {
+  document.getElementById("login-screen").style.display = "none";
+  document.getElementById("app-screen").style.display = "block";
+  document.getElementById("btn-logout").style.display = "block";
+  cargarSolicitudes();
+}
+
+// ─────────────────────────────────────────────
+//  GRAPH / SHAREPOINT
+// ─────────────────────────────────────────────
+function graphBase() {
+  return `https://graph.microsoft.com/v1.0/sites/gefit.sharepoint.com:/sites/GefitMexicoEngineering:/lists/${CONFIG.listName}`;
+}
+
+async function fetchItems() {
+  await getToken();
+  const url = `${graphBase()}/items?$orderby=fields/Created desc&$top=100&$expand=fields`;
+  const r = await fetch(url, {
+    headers: { "Authorization": `Bearer ${accessToken}`, "Accept": "application/json" }
+  });
+  if (!r.ok) throw new Error(`Error ${r.status}`);
+  const d = await r.json();
+  return d.value || [];
+}
+
+async function updateItem(itemId, fields) {
+  await getToken();
+  const r = await fetch(`${graphBase()}/items/${itemId}/fields`, {
+    method: "PATCH",
+    headers: {
+      "Authorization": `Bearer ${accessToken}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(fields)
+  });
+  if (!r.ok) throw new Error(`Error ${r.status}: ${await r.text()}`);
+  return r.json();
+}
+
+// ─────────────────────────────────────────────
+//  CARGAR Y RENDERIZAR
+// ─────────────────────────────────────────────
+async function cargarSolicitudes() {
+  const tbody = document.getElementById("tabla-body");
+  tbody.innerHTML = '<tr class="empty-row"><td colspan="6">Cargando...</td></tr>';
+  try {
+    allItems = await fetchItems();
+    actualizarStats();
+    renderTabla();
+  } catch(e) {
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="6">Error al cargar: ${e.message}</td></tr>`;
+  }
+}
+
+function actualizarStats() {
+  const pend = allItems.filter(i => i.fields.Estado === "Pendiente").length;
+  const aprob = allItems.filter(i => i.fields.Estado === "Aprobada").length;
+  const rech = allItems.filter(i => i.fields.Estado === "Rechazada").length;
+  document.getElementById("cnt-pendiente").textContent = pend;
+  document.getElementById("cnt-aprobada").textContent  = aprob;
+  document.getElementById("cnt-rechazada").textContent = rech;
+  document.getElementById("cnt-total").textContent     = allItems.length;
+}
+
+function setFiltro(btn) {
+  document.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  filtroEstado = btn.dataset.estado;
+  renderTabla();
+}
+
+function renderTabla() {
+  const busqueda = document.getElementById("filter-search").value.toLowerCase();
+  let items = allItems;
+
+  if (filtroEstado !== "Todos") items = items.filter(i => i.fields.Estado === filtroEstado);
+  if (busqueda) items = items.filter(i =>
+    (i.fields.NombreSolicitante || "").toLowerCase().includes(busqueda) ||
+    (i.fields.EmailSolicitante  || "").toLowerCase().includes(busqueda)
+  );
+
+  const tbody = document.getElementById("tabla-body");
+  if (!items.length) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="6">No hay solicitudes que coincidan.</td></tr>';
+    return;
+  }
+
+  const iconos  = { Vacaciones:"🏖️", "Permiso Personal":"🙋", Incapacidad:"🏥" };
+  const badgeCls = { Pendiente:"badge-pendiente", Aprobada:"badge-aprobada", Rechazada:"badge-rechazada" };
+
+  tbody.innerHTML = items.map(it => {
+    const f = it.fields;
+    const fechas = f.MedioDia
+      ? `Medio día — ${fmtFecha(f.FechaInicio)}`
+      : f.FechaInicio === f.FechaFin
+        ? fmtFecha(f.FechaInicio)
+        : `${fmtFecha(f.FechaInicio)} → ${fmtFecha(f.FechaFin)}`;
+    const esPendiente = f.Estado === "Pendiente";
+    const bCls = badgeCls[f.Estado] || "badge-pendiente";
+
+    return `<tr>
+      <td>
+        <div class="emp-name">${f.NombreSolicitante || "—"}</div>
+        <div class="emp-email">${f.EmailSolicitante || ""}</div>
+      </td>
+      <td>${iconos[f.TipoAusencia] || "📋"} ${f.TipoAusencia || "—"}</td>
+      <td style="white-space:nowrap">${fechas}</td>
+      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${f.Motivo||''}">${f.Motivo || <span style="color:var(--text-muted)">—</span>}</td>
+      <td><span class="badge ${bCls}">${f.Estado}</span>${f.ComentarioAdmin ? `<div style="font-size:11px;color:var(--text-muted);margin-top:3px">${f.ComentarioAdmin.substring(0,30)}...</div>` : ""}</td>
+      <td>
+        <div class="action-btns">
+          <button class="btn-ver" onclick='verDetalle(${JSON.stringify(it.id)})'>Ver</button>
+          ${esPendiente ? `
+            <button class="btn-aprobar"  onclick='abrirModal("${it.id}", "aprobar")'>✓</button>
+            <button class="btn-rechazar" onclick='abrirModal("${it.id}", "rechazar")'>✕</button>
+          ` : ""}
+        </div>
+      </td>
+    </tr>`;
+  }).join("");
+}
+
+// ─────────────────────────────────────────────
+//  MODAL ACCIÓN
+// ─────────────────────────────────────────────
+function abrirModal(itemId, accion) {
+  const item = allItems.find(i => i.id === itemId);
+  if (!item) return;
+  const f = item.fields;
+  pendingAction = { id: itemId, accion };
+
+  const esAprobar = accion === "aprobar";
+  document.getElementById("modal-title").textContent =
+    esAprobar ? "✓ Aprobar solicitud" : "✕ Rechazar solicitud";
+
+  const fechas = f.MedioDia
+    ? `Medio día — ${fmtFecha(f.FechaInicio)}`
+    : `${fmtFecha(f.FechaInicio)}${f.FechaFin !== f.FechaInicio ? " → " + fmtFecha(f.FechaFin) : ""}`;
+
+  document.getElementById("modal-body").innerHTML = `
+    <div class="modal-field"><label>Empleado</label><span>${f.NombreSolicitante}</span></div>
+    <div class="modal-field"><label>Tipo</label><span>${f.TipoAusencia}</span></div>
+    <div class="modal-field"><label>Fechas</label><span>${fechas}</span></div>
+    ${f.Motivo ? `<div class="modal-field"><label>Motivo</label><span>${f.Motivo}</span></div>` : ""}
+  `;
+
+  document.getElementById("modal-com-label").textContent =
+    esAprobar ? "Comentario para el empleado (opcional)" : "Motivo del rechazo (recomendado)";
+  document.getElementById("modal-comentario").value = "";
+
+  const btn = document.getElementById("modal-confirm-btn");
+  btn.textContent = esAprobar ? "Confirmar aprobación" : "Confirmar rechazo";
+  btn.className = `btn-modal-confirm ${esAprobar ? "aprobar" : "rechazar"}`;
+
+  document.getElementById("modal").classList.add("open");
+}
+
+function verDetalle(itemId) {
+  const item = allItems.find(i => i.id === itemId);
+  if (!item) return;
+  const f = item.fields;
+  const fechas = f.MedioDia
+    ? `Medio día — ${fmtFecha(f.FechaInicio)}`
+    : `${fmtFecha(f.FechaInicio)}${f.FechaFin !== f.FechaInicio ? " → " + fmtFecha(f.FechaFin) : ""}`;
+
+  document.getElementById("modal-title").textContent = "Detalle de solicitud";
+  document.getElementById("modal-body").innerHTML = `
+    <div class="modal-field"><label>Empleado</label><span>${f.NombreSolicitante} — ${f.EmailSolicitante}</span></div>
+    <div class="modal-field"><label>Tipo</label><span>${f.TipoAusencia}</span></div>
+    <div class="modal-field"><label>Fechas</label><span>${fechas}</span></div>
+    <div class="modal-field"><label>Estado</label><span>${f.Estado}</span></div>
+    ${f.Motivo ? `<div class="modal-field"><label>Motivo</label><span>${f.Motivo}</span></div>` : ""}
+    ${f.ReferenciaDoc ? `<div class="modal-field"><label>Ref. médica</label><span>${f.ReferenciaDoc}</span></div>` : ""}
+    ${f.ComentarioAdmin ? `<div class="modal-field"><label>Comentario admin</label><span>${f.ComentarioAdmin}</span></div>` : ""}
+  `;
+  document.getElementById("modal-comentario-wrap").style.display = "none";
+  pendingAction = null;
+
+  const btn = document.getElementById("modal-confirm-btn");
+  btn.textContent = "Cerrar";
+  btn.className = "btn-modal-cancel";
+  btn.onclick = cerrarModal;
+
+  document.getElementById("modal").classList.add("open");
+}
+
+function cerrarModal(e) {
+  if (e && e.target !== document.getElementById("modal")) return;
+  document.getElementById("modal").classList.remove("open");
+  document.getElementById("modal-comentario-wrap").style.display = "block";
+  document.getElementById("modal-confirm-btn").onclick = confirmarAccion;
+  pendingAction = null;
+}
+
+async function confirmarAccion() {
+  if (!pendingAction) { cerrarModal(); return; }
+
+  const { id, accion } = pendingAction;
+  const comentario = document.getElementById("modal-comentario").value.trim();
+  const nuevoEstado = accion === "aprobar" ? "Aprobada" : "Rechazada";
+
+  const btn = document.getElementById("modal-confirm-btn");
+  btn.disabled = true;
+  btn.textContent = "Procesando...";
+
+  try {
+    await updateItem(id, {
+      Estado:          nuevoEstado,
+      ComentarioAdmin: comentario,
+      FechaResolucion: new Date().toISOString().split("T")[0]
+    });
+
+    // Notificar Teams
+    const item = allItems.find(i => i.id === id);
+    if (item) await notificarResolucion(item.fields, nuevoEstado, comentario);
+
+    // Actualizar local
+    const idx = allItems.findIndex(i => i.id === id);
+    if (idx !== -1) {
+      allItems[idx].fields.Estado = nuevoEstado;
+      allItems[idx].fields.ComentarioAdmin = comentario;
+    }
+
+    cerrarModal();
+    actualizarStats();
+    renderTabla();
+    showToast(nuevoEstado === "Aprobada" ? "✓ Solicitud aprobada" : "✕ Solicitud rechazada");
+  } catch(e) {
+    alert("Error: " + e.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ─────────────────────────────────────────────
+//  TEAMS WEBHOOK — Notificación resolución
+// ─────────────────────────────────────────────
+async function notificarResolucion(f, estado, comentario) {
+  if (!CONFIG.teamsWebhook || CONFIG.teamsWebhook === "TU_WEBHOOK_URL") return;
+  const icon = estado === "Aprobada" ? "✅" : "❌";
+  const payload = {
+    "@type": "MessageCard",
+    "@context": "https://schema.org/extensions",
+    "themeColor": estado === "Aprobada" ? "1D6B45" : "8B2020",
+    "summary": `Solicitud ${estado} — ${f.NombreSolicitante}`,
+    "sections": [{
+      "activityTitle": `${icon} Solicitud ${estado} — ${f.TipoAusencia}`,
+      "activitySubtitle": f.NombreSolicitante,
+      "facts": [
+        { "name": "Estado",     "value": estado },
+        { "name": "Empleado",   "value": f.NombreSolicitante },
+        { "name": "Tipo",       "value": f.TipoAusencia },
+        { "name": "Comentario", "value": comentario || "—" }
+      ],
+      "markdown": true
+    }]
+  };
+  try {
+    await fetch(CONFIG.teamsWebhook, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+  } catch(e) { console.warn("Webhook:", e); }
+}
+
+// ─────────────────────────────────────────────
+//  UTILS
+// ─────────────────────────────────────────────
+function fmtFecha(str) {
+  if (!str) return "—";
+  const [y,m,d] = str.split("T")[0].split("-");
+  return `${d}/${m}/${y}`;
+}
+
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 3000);
+}
+
+// ─────────────────────────────────────────────
+//  EVENTI
+// ─────────────────────────────────────────────
+document.getElementById("btn-login").addEventListener("click", () =>
+  msalApp.loginRedirect({ scopes: SCOPES })
+);
+document.getElementById("btn-logout").addEventListener("click", () =>
+  msalApp.logoutRedirect()
+);
+
+init();
+</script>
+</body>
+</html>
