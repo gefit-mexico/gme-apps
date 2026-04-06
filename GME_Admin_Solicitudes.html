@@ -414,7 +414,7 @@ const CONFIG = {
 };
 
 const SCOPES_LOGIN = ["User.Read"];
-const SCOPES_SP    = ["https://graph.microsoft.com/Sites.ReadWrite.All"];
+const SCOPES_SP    = ["https://gefit.sharepoint.com/AllSites.Write"];
 
 const msalApp = new msal.PublicClientApplication({
   auth: {
@@ -476,35 +476,45 @@ function mostrarApp() {
 }
 
 // ─────────────────────────────────────────────
-//  GRAPH / SHAREPOINT
+//  SHAREPOINT REST API (come sistema anticipos)
 // ─────────────────────────────────────────────
-function graphBase() {
-  return `https://graph.microsoft.com/v1.0/sites/gefit.sharepoint.com:/sites/GefitMexicoEngineering:/lists/${CONFIG.listName}`;
+const SITE_URL = "https://gefit.sharepoint.com/sites/GefitMexicoEngineering";
+
+function spBase() {
+  return `${SITE_URL}/_api/web/lists/getbytitle('${CONFIG.listName}')`;
+}
+
+async function spHeaders(merge) {
+  await getToken();
+  return Object.assign({
+    "Authorization": `Bearer ${accessToken}`,
+    "Accept": "application/json;odata=verbose",
+    "Content-Type": "application/json;odata=verbose"
+  }, merge || {});
 }
 
 async function fetchItems() {
-  await getToken();
-  const url = `${graphBase()}/items?$orderby=fields/Created desc&$top=100&$expand=fields`;
-  const r = await fetch(url, {
-    headers: { "Authorization": `Bearer ${accessToken}`, "Accept": "application/json" }
-  });
+  const url = `${spBase()}/items?$orderby=Created desc&$top=100`;
+  const r = await fetch(url, { headers: await spHeaders() });
   if (!r.ok) throw new Error(`Error ${r.status}`);
   const d = await r.json();
-  return d.value || [];
+  return (d.d && d.d.results) ? d.d.results : [];
 }
 
 async function updateItem(itemId, fields) {
-  await getToken();
-  const r = await fetch(`${graphBase()}/items/${itemId}/fields`, {
-    method: "PATCH",
-    headers: {
-      "Authorization": `Bearer ${accessToken}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(fields)
+  const hdrs = await spHeaders({
+    "X-HTTP-Method": "MERGE",
+    "IF-MATCH": "*"
   });
-  if (!r.ok) throw new Error(`Error ${r.status}: ${await r.text()}`);
-  return r.json();
+  const metadata = { "__metadata": { "type": "SP.Data.GME_SolicitudesListItem" } };
+  const body = Object.assign({}, metadata, fields);
+  const r = await fetch(`${spBase()}/items(${itemId})`, {
+    method: "POST",
+    headers: hdrs,
+    body: JSON.stringify(body)
+  });
+  if (!r.ok && r.status !== 204) throw new Error(`Error ${r.status}: ${await r.text()}`);
+  return true;
 }
 
 // ─────────────────────────────────────────────
@@ -523,9 +533,9 @@ async function cargarSolicitudes() {
 }
 
 function actualizarStats() {
-  const pend = allItems.filter(i => i.fields.Estado === "Pendiente").length;
-  const aprob = allItems.filter(i => i.fields.Estado === "Aprobada").length;
-  const rech = allItems.filter(i => i.fields.Estado === "Rechazada").length;
+  const pend  = allItems.filter(i => i.Estado === "Pendiente").length;
+  const aprob = allItems.filter(i => i.Estado === "Aprobada").length;
+  const rech  = allItems.filter(i => i.Estado === "Rechazada").length;
   document.getElementById("cnt-pendiente").textContent = pend;
   document.getElementById("cnt-aprobada").textContent  = aprob;
   document.getElementById("cnt-rechazada").textContent = rech;
@@ -543,10 +553,10 @@ function renderTabla() {
   const busqueda = document.getElementById("filter-search").value.toLowerCase();
   let items = allItems;
 
-  if (filtroEstado !== "Todos") items = items.filter(i => i.fields.Estado === filtroEstado);
+  if (filtroEstado !== "Todos") items = items.filter(i => i.Estado === filtroEstado);
   if (busqueda) items = items.filter(i =>
-    (i.fields.NombreSolicitante || "").toLowerCase().includes(busqueda) ||
-    (i.fields.EmailSolicitante  || "").toLowerCase().includes(busqueda)
+    (i.NombreSolicitante || "").toLowerCase().includes(busqueda) ||
+    (i.EmailSolicitante  || "").toLowerCase().includes(busqueda)
   );
 
   const tbody = document.getElementById("tabla-body");
@@ -559,7 +569,7 @@ function renderTabla() {
   const badgeCls = { Pendiente:"badge-pendiente", Aprobada:"badge-aprobada", Rechazada:"badge-rechazada" };
 
   tbody.innerHTML = items.map(it => {
-    const f = it.fields;
+    const f = it; // REST: campi direttamente sull'oggetto
     const fechas = f.MedioDia
       ? `Medio día — ${fmtFecha(f.FechaInicio)}`
       : f.FechaInicio === f.FechaFin
@@ -579,10 +589,10 @@ function renderTabla() {
       <td><span class="badge ${bCls}">${f.Estado}</span>${f.ComentarioAdmin ? `<div style="font-size:11px;color:var(--text-muted);margin-top:3px">${f.ComentarioAdmin.substring(0,30)}...</div>` : ""}</td>
       <td>
         <div class="action-btns">
-          <button class="btn-ver" onclick='verDetalle(${JSON.stringify(it.id)})'>Ver</button>
+          <button class="btn-ver" onclick='verDetalle(${f.Id})'>Ver</button>
           ${esPendiente ? `
-            <button class="btn-aprobar"  onclick='abrirModal("${it.id}", "aprobar")'>✓</button>
-            <button class="btn-rechazar" onclick='abrirModal("${it.id}", "rechazar")'>✕</button>
+            <button class="btn-aprobar"  onclick='abrirModal(${f.Id}, "aprobar")'>✓</button>
+            <button class="btn-rechazar" onclick='abrirModal(${f.Id}, "rechazar")'>✕</button>
           ` : ""}
         </div>
       </td>
@@ -594,9 +604,9 @@ function renderTabla() {
 //  MODAL ACCIÓN
 // ─────────────────────────────────────────────
 function abrirModal(itemId, accion) {
-  const item = allItems.find(i => i.id === itemId);
+  const item = allItems.find(i => i.Id === itemId);
   if (!item) return;
-  const f = item.fields;
+  const f = item;
   pendingAction = { id: itemId, accion };
 
   const esAprobar = accion === "aprobar";
@@ -626,9 +636,9 @@ function abrirModal(itemId, accion) {
 }
 
 function verDetalle(itemId) {
-  const item = allItems.find(i => i.id === itemId);
+  const item = allItems.find(i => i.Id === itemId);
   if (!item) return;
-  const f = item.fields;
+  const f = item;
   const fechas = f.MedioDia
     ? `Medio día — ${fmtFecha(f.FechaInicio)}`
     : `${fmtFecha(f.FechaInicio)}${f.FechaFin !== f.FechaInicio ? " → " + fmtFecha(f.FechaFin) : ""}`;
@@ -680,14 +690,12 @@ async function confirmarAccion() {
       FechaResolucion: new Date().toISOString().split("T")[0]
     });
 
-    // Notificar Teams
-    const item = allItems.find(i => i.id === id);
-    if (item) await notificarResolucion(item.fields, nuevoEstado, comentario);
+    const item = allItems.find(i => i.Id === id);
+    if (item) await notificarResolucion(item, nuevoEstado, comentario);
 
-    // Actualizar local
-    const idx = allItems.findIndex(i => i.id === id);
+    const idx = allItems.findIndex(i => i.Id === id);
     if (idx !== -1) {
-      allItems[idx].fields.Estado = nuevoEstado;
+      allItems[idx].Estado = nuevoEstado;
       allItems[idx].fields.ComentarioAdmin = comentario;
     }
 
