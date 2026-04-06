@@ -341,6 +341,21 @@
     .field-row { grid-template-columns: 1fr; }
     header { padding: 0 1rem; }
   }
+
+  /* FILE UPLOAD */
+  .file-drop-area {
+    border: 2px dashed var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-size: 13px;
+    color: var(--text-muted);
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .file-drop-area:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-light); }
+  .file-drop-area.dragover { border-color: var(--accent); background: var(--accent-light); }
 </style>
 </head>
 <body>
@@ -445,6 +460,20 @@
       <div class="field" id="doc-field" style="display:none">
         <label>Número de folio IMSS / Referencia médica</label>
         <input type="text" id="doc-ref" placeholder="Ej. 12345678">
+      </div>
+      <div class="field" id="adjunto-field" style="display:none">
+        <label>Documento adjunto <span style="font-size:11px;color:var(--text-muted);font-weight:400">(JPG, PNG, PDF — máx. 10 MB)</span></label>
+        <div class="file-drop-area" id="file-drop-area" onclick="document.getElementById('adjunto-input').click()">
+          <span id="file-drop-icon">📎</span>
+          <span id="file-drop-text">Toca para adjuntar o arrastra aquí</span>
+          <input type="file" id="adjunto-input" accept=".jpg,.jpeg,.png,.pdf" style="display:none" onchange="onFileSelected(this)">
+        </div>
+        <div id="file-preview" style="display:none;margin-top:8px;padding:8px 12px;background:var(--accent-light);border-radius:8px;font-size:13px;align-items:center;gap:8px;color:var(--accent)">
+          <span id="file-preview-icon">📄</span>
+          <span id="file-preview-name"></span>
+          <span id="file-preview-size" style="color:var(--text-muted);font-size:11px"></span>
+          <button onclick="clearFile()" style="margin-left:auto;background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:16px">✕</button>
+        </div>
       </div>
     </div>
 
@@ -566,6 +595,7 @@ function selTipo(btn) {
 
   medioDiaRow.style.display = tipoSeleccionado === "Permiso Personal" ? "block" : "none";
   docField.style.display    = tipoSeleccionado === "Incapacidad" ? "block" : "none";
+  document.getElementById("adjunto-field").style.display = tipoSeleccionado === "Incapacidad" ? "block" : "none";
 
   if (tipoSeleccionado !== "Permiso Personal") {
     chk.checked = false;
@@ -775,6 +805,71 @@ async function notificarTeams(solicitud) {
   }
 }
 
+
+// ─────────────────────────────────────────────
+//  FILE UPLOAD
+// ─────────────────────────────────────────────
+let adjuntoFile = null;
+
+function onFileSelected(input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (file.size > 10 * 1024 * 1024) {
+    showAlert("El archivo supera el límite de 10 MB.", "error");
+    input.value = "";
+    return;
+  }
+  adjuntoFile = file;
+  const ext = file.name.split(".").pop().toLowerCase();
+  const icon = ext === "pdf" ? "📄" : "🖼️";
+  document.getElementById("file-preview-icon").textContent = icon;
+  document.getElementById("file-preview-name").textContent = file.name;
+  document.getElementById("file-preview-size").textContent = `(${(file.size/1024).toFixed(0)} KB)`;
+  document.getElementById("file-preview").style.display = "flex";
+  document.getElementById("file-drop-text").textContent = "Cambiar archivo";
+}
+
+function clearFile() {
+  adjuntoFile = null;
+  document.getElementById("adjunto-input").value = "";
+  document.getElementById("file-preview").style.display = "none";
+  document.getElementById("file-drop-text").textContent = "Toca para adjuntar o arrastra aquí";
+}
+
+// Drag & drop
+document.addEventListener("DOMContentLoaded", () => {
+  const area = document.getElementById("file-drop-area");
+  if (!area) return;
+  area.addEventListener("dragover", e => { e.preventDefault(); area.classList.add("dragover"); });
+  area.addEventListener("dragleave", () => area.classList.remove("dragover"));
+  area.addEventListener("drop", e => {
+    e.preventDefault(); area.classList.remove("dragover");
+    const file = e.dataTransfer.files[0];
+    if (file) { document.getElementById("adjunto-input").files = e.dataTransfer.files; onFileSelected(document.getElementById("adjunto-input")); }
+  });
+});
+
+async function subirAdjunto(itemId, file) {
+  await getToken();
+  const siteUrl = CONFIG.siteUrl;
+  // Usa la libreria "Documentos" del sito — cartella GME_Solicitudes
+  const folderUrl = `${siteUrl}/_api/web/GetFolderByServerRelativeUrl('Documentos Compartidos')/Files/add(url='SOL-${itemId}-${file.name}',overwrite=true)`;
+  const r = await fetch(folderUrl, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${accessToken}`,
+      "Accept": "application/json;odata=verbose",
+      "Content-Length": file.size
+    },
+    body: file
+  });
+  if (!r.ok) {
+    const txt = await r.text();
+    console.warn("Upload adjunto:", r.status, txt);
+    // Non blocca l'invio se fallisce
+  }
+}
+
 // ─────────────────────────────────────────────
 //  ENVIAR SOLICITUD
 // ─────────────────────────────────────────────
@@ -809,7 +904,11 @@ async function enviarSolicitud() {
   };
 
   try {
-    await crearItemSP(fields);
+    const result = await crearItemSP(fields);
+    const itemId = result?.d?.Id || result?.Id;
+    if (adjuntoFile && itemId) {
+      try { await subirAdjunto(itemId, adjuntoFile); } catch(e) { console.warn("Adjunto no subido:", e); }
+    }
     await notificarTeams({
       nombre, email,
       tipo:      tipoSeleccionado,
@@ -825,6 +924,7 @@ async function enviarSolicitud() {
     document.getElementById("fecha-fin").value = "";
     document.getElementById("motivo").value = "";
     document.getElementById("doc-ref").value = "";
+    clearFile();
     document.getElementById("chk-medio-dia").checked = false;
     toggleMedioDia();
     document.getElementById("duracion-info").style.display = "none";
