@@ -876,7 +876,8 @@ async function subirAdjunto(itemId, file) {
   await getToken();
   const siteUrl = CONFIG.siteUrl;
   // Usa la libreria "Documentos" del sito — cartella GME_Solicitudes
-  const folderUrl = `${siteUrl}/_api/web/GetFolderByServerRelativeUrl('Documentos Compartidos')/Files/add(url='SOL-${itemId}-${file.name}',overwrite=true)`;
+  // Cartella privata: solo Proprietari hanno accesso
+  const folderUrl = `${siteUrl}/_api/web/GetFolderByServerRelativeUrl('Documenti condivisi/GME_Solicitudes_Docs')/Files/add(url='SOL-${itemId}-${file.name}',overwrite=true)`;
   const r = await fetch(folderUrl, {
     method: "POST",
     headers: {
