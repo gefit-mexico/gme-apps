@@ -408,7 +408,7 @@ const CONFIG = {
   clientId:    "1581f9ad-82e6-494e-810b-f8c18271ce4c",
   tenantId:    "5e9917fe-df22-4e96-a361-9e14199c0a13",
   listName:    "GME_Solicitudes",
-  teamsWebhook: "https://gefit.webhook.office.com/webhookb2/366303f8-9cec-4711-965b-6e8e262d8bc8@5e9917fe-df22-4e96-a361-9e14199c0a13/IncomingWebhook/a2b648a79b314c6cbe501759ded7e104/831e1f38-334b-4a6a-885f-3affac7ebfef/V2ac-KMCwyUcANeBR2v4bOvhf-hTFF19Wv3UbJUEg0zfs1",
+  // teamsWebhook: rimosso — notifiche gestite da Power Automate
   redirectUri: window.location.origin + window.location.pathname
 };
 
@@ -713,12 +713,12 @@ async function confirmarAccion() {
     });
 
     const item = allItems.find(i => i.Id === id);
-    if (item) await notificarResolucion(item, nuevoEstado, comentario);
+    // Notifica Teams gestita da Power Automate
 
     const idx = allItems.findIndex(i => i.Id === id);
     if (idx !== -1) {
       allItems[idx].Estado = nuevoEstado;
-      allItems[idx].fields.ComentarioAdmin = comentario;
+      allItems[idx].ComentarioAdmin = comentario;
     }
 
     cerrarModal();
