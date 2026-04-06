@@ -16,6 +16,7 @@
     --text-muted: #7A7870;
     --accent: #2EA8D5;
     --accent-light: #E6F6FB;
+    --header-bg: #0D2B45;
     --success: #1D6B45;
     --success-bg: #E8F5EE;
     --error: #8B2020;
@@ -39,7 +40,7 @@
 
   /* HEADER */
   header {
-    background: var(--accent);
+    background: var(--header-bg);
     color: #fff;
     padding: 0 2rem;
     height: 58px;
@@ -56,10 +57,10 @@
     gap: 12px;
   }
   .logo-mark {
-    height: 36px;
+    height: 34px;
     width: auto;
     display: block;
-    filter: brightness(0) invert(1);
+    border-radius: 4px;
   }
   .header-title { font-size: 15px; font-weight: 500; opacity: 0.95; }
   .header-sub { font-size: 12px; opacity: 0.55; }
@@ -346,10 +347,8 @@
 
 <header>
   <div class="header-brand">
-    <div class="logo-mark-wrap">
-      <img class="logo-mark" src="https://gefit-mexico.github.io/gme-apps/Logo_GEFIT_MEXICO_RGB.jpg" alt="GEFIT Mexico">
-    </div>
-    <div>
+    <img class="logo-mark" src="https://gefit-mexico.github.io/gme-apps/Logo_GEFIT_MEXICO_RGB.jpg" alt="GEFIT Mexico">
+    <div style="border-left:1px solid rgba(255,255,255,0.15);padding-left:14px">
       <div class="header-title">GEFIT Mexico Engineering</div>
       <div class="header-sub">Portal de Ausencias</div>
     </div>
@@ -684,7 +683,7 @@ async function notificarTeams(solicitud) {
   const payload = {
     "@type": "MessageCard",
     "@context": "https://schema.org/extensions",
-    "themeColor": "2EA8D5",
+    "themeColor": "1A3C5E",
     "summary": `Nueva solicitud de ${solicitud.nombre}`,
     "sections": [{
       "activityTitle": `${iconos[solicitud.tipo] || "📋"} Nueva solicitud — ${solicitud.tipo}`,
