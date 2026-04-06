@@ -413,7 +413,8 @@ const CONFIG = {
   redirectUri: window.location.origin + window.location.pathname
 };
 
-const SCOPES = ["https://graph.microsoft.com/Sites.ReadWrite.All"];
+const SCOPES_LOGIN = ["User.Read"];
+const SCOPES_SP    = ["https://graph.microsoft.com/Sites.ReadWrite.All"];
 
 const msalApp = new msal.PublicClientApplication({
   auth: {
@@ -428,7 +429,7 @@ let currentUser = null;
 let accessToken = null;
 let allItems    = [];
 let filtroEstado = "Todos";
-let pendingAction = null; // { id, action }
+let pendingAction = null;
 
 // ─────────────────────────────────────────────
 //  AUTH
@@ -437,9 +438,9 @@ async function init() {
   try {
     const resp = await msalApp.handleRedirectPromise();
     if (resp) {
-      accessToken = resp.accessToken;
       currentUser = resp.account;
       msalApp.setActiveAccount(currentUser);
+      await getToken();
       mostrarApp();
     } else {
       const accounts = msalApp.getAllAccounts();
@@ -455,9 +456,16 @@ async function init() {
 
 async function getToken() {
   try {
-    const r = await msalApp.acquireTokenSilent({ scopes: SCOPES, account: currentUser });
+    const r = await msalApp.acquireTokenSilent({ scopes: SCOPES_SP, account: currentUser });
     accessToken = r.accessToken;
-  } catch { await msalApp.acquireTokenRedirect({ scopes: SCOPES }); }
+  } catch {
+    try {
+      const r2 = await msalApp.acquireTokenSilent({ scopes: SCOPES_LOGIN, account: currentUser });
+      accessToken = r2.accessToken;
+    } catch {
+      await msalApp.acquireTokenRedirect({ scopes: SCOPES_SP });
+    }
+  }
 }
 
 function mostrarApp() {
@@ -567,7 +575,7 @@ function renderTabla() {
       </td>
       <td>${iconos[f.TipoAusencia] || "📋"} ${f.TipoAusencia || "—"}</td>
       <td style="white-space:nowrap">${fechas}</td>
-      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${f.Motivo||''}">${f.Motivo || <span style="color:var(--text-muted)">—</span>}</td>
+      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${f.Motivo||''}">${f.Motivo || "—"}</td>
       <td><span class="badge ${bCls}">${f.Estado}</span>${f.ComentarioAdmin ? `<div style="font-size:11px;color:var(--text-muted);margin-top:3px">${f.ComentarioAdmin.substring(0,30)}...</div>` : ""}</td>
       <td>
         <div class="action-btns">
@@ -746,7 +754,7 @@ function showToast(msg) {
 //  EVENTI
 // ─────────────────────────────────────────────
 document.getElementById("btn-login").addEventListener("click", () =>
-  msalApp.loginRedirect({ scopes: SCOPES })
+  msalApp.loginRedirect({ scopes: SCOPES_LOGIN })
 );
 document.getElementById("btn-logout").addEventListener("click", () =>
   msalApp.logoutRedirect()
