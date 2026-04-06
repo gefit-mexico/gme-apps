@@ -732,37 +732,7 @@ async function confirmarAccion() {
   }
 }
 
-// ─────────────────────────────────────────────
-//  TEAMS WEBHOOK — Notificación resolución
-// ─────────────────────────────────────────────
-async function notificarResolucion(f, estado, comentario) {
-  if (!CONFIG.teamsWebhook || CONFIG.teamsWebhook === "TU_WEBHOOK_URL") return;
-  const icon = estado === "Aprobada" ? "✅" : "❌";
-  const payload = {
-    "@type": "MessageCard",
-    "@context": "https://schema.org/extensions",
-    "themeColor": estado === "Aprobada" ? "1D6B45" : "8B2020",
-    "summary": `Solicitud ${estado} — ${f.NombreSolicitante}`,
-    "sections": [{
-      "activityTitle": `${icon} Solicitud ${estado} — ${f.TipoAusencia}`,
-      "activitySubtitle": f.NombreSolicitante,
-      "facts": [
-        { "name": "Estado",     "value": estado },
-        { "name": "Empleado",   "value": f.NombreSolicitante },
-        { "name": "Tipo",       "value": f.TipoAusencia },
-        { "name": "Comentario", "value": comentario || "—" }
-      ],
-      "markdown": true
-    }]
-  };
-  try {
-    await fetch(CONFIG.teamsWebhook, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
-  } catch(e) { console.warn("Webhook:", e); }
-}
+// Notifiche Teams gestite da Power Automate
 
 // ─────────────────────────────────────────────
 //  UTILS
