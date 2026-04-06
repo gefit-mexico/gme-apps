@@ -663,7 +663,9 @@ function calcDuracion() {
 }
 
 function formatFecha(str) {
-  const [y,m,d] = str.split("-");
+  if (!str) return "—";
+  const clean = str.substring(0, 10);
+  const [y,m,d] = clean.split("-");
   return `${d}/${m}/${y}`;
 }
 
