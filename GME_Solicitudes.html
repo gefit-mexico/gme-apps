@@ -500,7 +500,7 @@ const CONFIG = {
   tenantId:     "5e9917fe-df22-4e96-a361-9e14199c0a13",
   siteUrl:      "https://gefit.sharepoint.com/sites/GefitMexicoEngineering",
   listName:     "GME_Solicitudes",
-  teamsWebhook: "https://gefit.webhook.office.com/webhookb2/366303f8-9cec-4711-965b-6e8e262d8bc8@5e9917fe-df22-4e96-a361-9e14199c0a13/IncomingWebhook/a2b648a79b314c6cbe501759ded7e104/831e1f38-334b-4a6a-885f-3affac7ebfef/V2ac-KMCwyUcANeBR2v4bOvhf-hTFF19Wv3UbJUEg0zfs1",
+  // teamsWebhook: eliminato — le notifiche Teams le gestisce Power Automate
   redirectUri:  window.location.origin + window.location.pathname
 };
 
@@ -945,14 +945,6 @@ async function enviarSolicitud() {
         showAlert("⚠ Solicitud enviada, pero el documento no se pudo adjuntar.", "warning");
       }
     }
-    await notificarTeams({
-      nombre, email,
-      tipo:      tipoSeleccionado,
-      fechaInicio: formatFecha(inicio),
-      fechaFin:    formatFecha(fechaFin),
-      medioDia, motivo
-    });
-
     showAlert("✓ Solicitud enviada correctamente. El administrador la revisará pronto.", "success");
 
     // reset form
