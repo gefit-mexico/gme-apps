@@ -592,10 +592,26 @@ function selTipo(btn) {
   const medioDiaRow = document.getElementById("medio-dia-row");
   const docField    = document.getElementById("doc-field");
   const chk         = document.getElementById("chk-medio-dia");
+  const today       = new Date().toISOString().split("T")[0];
+  const inputInicio = document.getElementById("fecha-inicio");
+  const inputFin    = document.getElementById("fecha-fin");
 
   medioDiaRow.style.display = tipoSeleccionado === "Permiso Personal" ? "block" : "none";
   docField.style.display    = tipoSeleccionado === "Incapacidad" ? "block" : "none";
   document.getElementById("adjunto-field").style.display = tipoSeleccionado === "Incapacidad" ? "block" : "none";
+
+  if (tipoSeleccionado === "Incapacidad") {
+    // Solo fechas hasta hoy
+    inputInicio.max = today;
+    inputFin.max    = today;
+    // Se la data selezionata è futura, reset
+    if (inputInicio.value > today) { inputInicio.value = ""; inputFin.value = ""; }
+    if (inputFin.value > today)    { inputFin.value = today; }
+  } else {
+    // Vacaciones / Permiso Personal: rimuovi il limite max
+    inputInicio.removeAttribute("max");
+    inputFin.removeAttribute("max");
+  }
 
   if (tipoSeleccionado !== "Permiso Personal") {
     chk.checked = false;
@@ -649,15 +665,22 @@ function diasHabiles(inicio, fin) {
 }
 
 function onInicioChange() {
-  const inicio = document.getElementById("fecha-inicio").value;
-  const fin    = document.getElementById("fecha-fin").value;
-  // Se fecha-fin è vuota o precedente all'inizio, imposta = inizio
-  if (inicio && (!fin || fin < inicio)) {
-    document.getElementById("fecha-fin").value = inicio;
-  }
-  // Imposta min della fecha-fin = fecha-inicio
+  const inicio    = document.getElementById("fecha-inicio").value;
+  const fin       = document.getElementById("fecha-fin").value;
+  const today     = new Date().toISOString().split("T")[0];
+  const inputFin  = document.getElementById("fecha-fin");
+
   if (inicio) {
-    document.getElementById("fecha-fin").min = inicio;
+    inputFin.min = inicio;
+    // Per Incapacidad: fecha-fin non può superare oggi
+    if (tipoSeleccionado === "Incapacidad") {
+      inputFin.max = today;
+    }
+    if (!fin || fin < inicio) inputFin.value = inicio;
+    // Se Incapacidad e la nuova fecha-fin supera oggi, correggila
+    if (tipoSeleccionado === "Incapacidad" && inputFin.value > today) {
+      inputFin.value = today;
+    }
   }
   calcDuracion();
 }
@@ -883,6 +906,13 @@ async function enviarSolicitud() {
   if (!inicio) { showAlert("Por favor selecciona la fecha de inicio.", "error"); return; }
   if (!medioDia && !fin) { showAlert("Por favor selecciona la fecha de fin.", "error"); return; }
   if (!medioDia && fin < inicio) { showAlert("La fecha de fin no puede ser anterior al inicio.", "error"); return; }
+  const today = new Date().toISOString().split("T")[0];
+  if (tipoSeleccionado === "Incapacidad" && inicio > today) {
+    showAlert("Para Incapacidad, la fecha de inicio no puede ser futura.", "error"); return;
+  }
+  if (tipoSeleccionado === "Incapacidad" && !medioDia && fin > today) {
+    showAlert("Para Incapacidad, la fecha de fin no puede ser futura.", "error"); return;
+  }
 
   setBtnLoading(true);
 
