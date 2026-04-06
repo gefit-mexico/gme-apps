@@ -14,8 +14,8 @@
     --border: #E2E0D8;
     --text: #1A1916;
     --text-muted: #7A7870;
-    --accent: #1A3C5E;
-    --accent-light: #EAF1F8;
+    --accent: #2EA8D5;
+    --accent-light: #E6F6FB;
     --success: #1D6B45;
     --success-bg: #E8F5EE;
     --success-border: #B8DFC9;
@@ -51,12 +51,10 @@
   }
   .header-brand { display: flex; align-items: center; gap: 12px; }
   .logo-mark {
-    width: 32px; height: 32px;
-    background: rgba(255,255,255,0.15);
-    border-radius: 8px;
-    display: flex; align-items: center; justify-content: center;
-    font-family: 'DM Mono', monospace;
-    font-size: 13px; font-weight: 500;
+    height: 36px;
+    width: auto;
+    display: block;
+    filter: brightness(0) invert(1);
   }
   .header-title { font-size: 15px; font-weight: 500; opacity: 0.95; }
   .header-sub { font-size: 12px; opacity: 0.55; }
@@ -317,7 +315,9 @@
 
 <header>
   <div class="header-brand">
-    <div class="logo-mark">GME</div>
+    <div class="logo-mark-wrap">
+      <img class="logo-mark" src="https://gefit-mexico.github.io/gme-apps/Logo_GEFIT_MEXICO_RGB.jpg" alt="GEFIT Mexico">
+    </div>
     <div>
       <div class="header-title" style="display:flex;align-items:center;gap:6px">
         Administración de Ausencias
