@@ -938,7 +938,12 @@ async function enviarSolicitud() {
     const result = await crearItemSP(fields);
     const itemId = result?.d?.Id || result?.Id;
     if (adjuntoFile && itemId) {
-      try { await subirAdjunto(itemId, adjuntoFile); } catch(e) { console.warn("Adjunto no subido:", e); }
+      try {
+        await subirAdjunto(itemId, adjuntoFile);
+      } catch(e) {
+        console.warn("Adjunto no subido:", e);
+        showAlert("⚠ Solicitud enviada, pero el documento no se pudo adjuntar.", "warning");
+      }
     }
     await notificarTeams({
       nombre, email,

@@ -634,13 +634,35 @@ function abrirModal(itemId, accion) {
   document.getElementById("modal").classList.add("open");
 }
 
-function verDetalle(itemId) {
+async function verDetalle(itemId) {
   const item = allItems.find(i => i.Id === itemId);
   if (!item) return;
   const f = item;
   const fechas = f.MedioDia
     ? `Medio día — ${fmtFecha(f.FechaInicio)}`
     : `${fmtFecha(f.FechaInicio)}${f.FechaFin !== f.FechaInicio ? " → " + fmtFecha(f.FechaFin) : ""}`;
+
+  // Cerca documento allegato nella cartella privata
+  let adjuntoHtml = "";
+  try {
+    await getToken();
+    const folderPath = "Documenti condivisi/GME_Solicitudes_Docs";
+    const filesUrl = `${SITE_URL}/_api/web/GetFolderByServerRelativeUrl('${folderPath}')/Files?$filter=startswith(Name,'SOL-${f.Id}-')`;
+    const r = await fetch(filesUrl, { headers: await spHeaders() });
+    if (r.ok) {
+      const data = await r.json();
+      const files = (data.d && data.d.results) ? data.d.results : [];
+      if (files.length > 0) {
+        const fileLinks = files.map(file => {
+          const fileUrl = `${SITE_URL}/Documenti condivisi/GME_Solicitudes_Docs/${file.Name}`;
+          const ext = file.Name.split(".").pop().toLowerCase();
+          const icon = ext === "pdf" ? "📄" : "🖼️";
+          return `<a href="${fileUrl}" target="_blank" style="display:inline-flex;align-items:center;gap:6px;color:var(--accent);font-size:13px;text-decoration:none;padding:6px 10px;background:var(--accent-light);border-radius:6px;margin-top:4px">${icon} ${file.Name}</a>`;
+        }).join("<br>");
+        adjuntoHtml = `<div class="modal-field"><label>Documento adjunto</label><div>${fileLinks}</div></div>`;
+      }
+    }
+  } catch(e) { console.warn("No se pudo buscar adjunto:", e); }
 
   document.getElementById("modal-title").textContent = "Detalle de solicitud";
   document.getElementById("modal-body").innerHTML = `
@@ -650,6 +672,7 @@ function verDetalle(itemId) {
     <div class="modal-field"><label>Estado</label><span>${f.Estado}</span></div>
     ${f.Motivo ? `<div class="modal-field"><label>Motivo</label><span>${f.Motivo}</span></div>` : ""}
     ${f.ReferenciaDoc ? `<div class="modal-field"><label>Ref. médica</label><span>${f.ReferenciaDoc}</span></div>` : ""}
+    ${adjuntoHtml}
     ${f.ComentarioAdmin ? `<div class="modal-field"><label>Comentario admin</label><span>${f.ComentarioAdmin}</span></div>` : ""}
   `;
   document.getElementById("modal-comentario-wrap").style.display = "none";
