@@ -347,7 +347,7 @@
 
 <header>
   <div class="header-brand">
-    <img class="logo-mark" src="https://gefit-mexico.github.io/gme-apps/Logo_GEFIT_MEXICO_RGB.jpg" alt="GEFIT Mexico">
+    <img class="logo-mark" src="https://gefit-mexico.github.io/gme-apps/Logo_GEFIT_MEXICO_small-removebg-preview.png" alt="GEFIT Mexico">
     <div style="border-left:1px solid rgba(255,255,255,0.15);padding-left:14px">
       <div class="header-title">GEFIT Mexico Engineering</div>
       <div class="header-sub">Portal de Ausencias</div>
@@ -705,7 +705,7 @@ async function spHeaders() {
 
 async function crearItemSP(fields) {
   await getToken();
-  const metadata = { "__metadata": { "type": "SP.Data.GME_SolicitudesListItem" } };
+  const metadata = { "__metadata": { "type": "SP.Data.GME_x005f_SolicitudesListItem" } };
   const body = Object.assign({}, metadata, fields);
   const r = await fetch(`${spBase()}/items`, {
     method: "POST",
