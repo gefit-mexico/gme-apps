@@ -4,7 +4,149 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>GME Admin — Solicitudes de Ausencia</title>
-<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js">
+// ─────────────────────────────────────────────
+//  EXPORT / PRINT
+// ─────────────────────────────────────────────
+function getItemsFiltradosPorFecha() {
+  const desde = document.getElementById('exp-desde').value;
+  const hasta = document.getElementById('exp-hasta').value;
+  const busqueda = document.getElementById('filter-search').value.toLowerCase();
+  let items = allItems;
+  if (filtroEstado !== 'Todos') items = items.filter(i => i.Estado === filtroEstado);
+  if (busqueda) items = items.filter(i =>
+    (i.NombreSolicitante||'').toLowerCase().includes(busqueda) ||
+    (i.EmailSolicitante||'').toLowerCase().includes(busqueda)
+  );
+  if (desde) items = items.filter(i => i.FechaInicio >= desde);
+  if (hasta) items = items.filter(i => i.FechaInicio <= hasta);
+  return items;
+}
+
+function buildPrintSubtitle() {
+  const desde = document.getElementById('exp-desde').value;
+  const hasta = document.getElementById('exp-hasta').value;
+  const estado = filtroEstado !== 'Todos' ? ` | Estado: ${filtroEstado}` : '';
+  const periodo = desde && hasta
+    ? ` | Período: ${fmtFecha(desde)} → ${fmtFecha(hasta)}`
+    : desde ? ` | Desde: ${fmtFecha(desde)}`
+    : hasta ? ` | Hasta: ${fmtFecha(hasta)}`
+    : ' | Todos los períodos';
+  return `Generado: ${new Date().toLocaleString('es-MX')}${periodo}${estado}`;
+}
+
+function imprimirTabla() {
+  const items = getItemsFiltradosPorFecha();
+  if (!items.length) { alert('No hay solicitudes en el período seleccionado.'); return; }
+  document.getElementById('print-subtitle').textContent = buildPrintSubtitle();
+  window.print();
+}
+
+function exportarExcel() {
+  const items = getItemsFiltradosPorFecha();
+  if (!items.length) { alert('No hay solicitudes en el período seleccionado.'); return; }
+  const iconos = { Vacaciones:'Vacaciones', 'Permiso Personal':'Permiso Personal', Incapacidad:'Incapacidad' };
+  const filas = items.map(i => {
+    const fechas = i.MedioDia
+      ? 'Medio día — ' + fmtFecha(i.FechaInicio)
+      : i.FechaInicio === i.FechaFin ? fmtFecha(i.FechaInicio)
+      : fmtFecha(i.FechaInicio) + ' → ' + fmtFecha(i.FechaFin);
+    return [
+      i.NombreSolicitante || '',
+      i.EmailSolicitante || '',
+      iconos[i.TipoAusencia] || i.TipoAusencia || '',
+      fmtFecha(i.FechaInicio),
+      fmtFecha(i.FechaFin),
+      i.MedioDia ? 'Sí' : 'No',
+      i.Motivo || '',
+      i.Estado || '',
+      i.ComentarioAdmin || ''
+    ];
+  });
+  const headers = ['Empleado','Email','Tipo','Fecha Inicio','Fecha Fin','Medio Día','Motivo','Estado','Comentario Admin'];
+  const subtitle = buildPrintSubtitle();
+
+  // Costruire XML Excel (formato SpreadsheetML — apre in Excel senza librerie esterne)
+  const xmlRows = [headers, ...filas].map(row =>
+    '<Row>' + row.map(cell =>
+      `<Cell><Data ss:Type="String">${String(cell).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</Data></Cell>`
+    ).join('') + '</Row>'
+  ).join('');
+
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+  xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+  <Worksheet ss:Name="Solicitudes">
+    <Table>
+      <Row><Cell ss:MergeAcross="8"><Data ss:Type="String">GME — Reporte de Solicitudes de Ausencia</Data></Cell></Row>
+      <Row><Cell ss:MergeAcross="8"><Data ss:Type="String">${subtitle}</Data></Cell></Row>
+      <Row></Row>
+      ${xmlRows}
+    </Table>
+  </Worksheet>
+</Workbook>`;
+
+  const blob = new Blob([xml], { type: 'application/vnd.ms-excel;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  const fecha = new Date().toISOString().slice(0,10);
+  a.download = `GME_Solicitudes_${fecha}.xls`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function exportarPDF() {
+  const items = getItemsFiltradosPorFecha();
+  if (!items.length) { alert('No hay solicitudes en el período seleccionado.'); return; }
+  const subtitle = buildPrintSubtitle();
+  const iconos = { Vacaciones:'🏖️', 'Permiso Personal':'🙋', Incapacidad:'🏥' };
+  const badgeColor = { Pendiente:'#7A4F00;background:#FFF4DC', Aprobada:'#1D6B45;background:#E8F5EE', Rechazada:'#8B2020;background:#FAEAEA' };
+
+  const filas = items.map(i => {
+    const fechas = i.MedioDia
+      ? 'Medio día — ' + fmtFecha(i.FechaInicio)
+      : i.FechaInicio === i.FechaFin ? fmtFecha(i.FechaInicio)
+      : fmtFecha(i.FechaInicio) + ' → ' + fmtFecha(i.FechaFin);
+    const bc = badgeColor[i.Estado] || 'color:#333;background:#eee';
+    return `<tr>
+      <td>${i.NombreSolicitante||'—'}<br><span style="font-size:10px;color:#888">${i.EmailSolicitante||''}</span></td>
+      <td>${iconos[i.TipoAusencia]||''} ${i.TipoAusencia||'—'}</td>
+      <td style="white-space:nowrap">${fechas}</td>
+      <td>${i.Motivo||'—'}</td>
+      <td><span style="border-radius:20px;padding:2px 8px;font-size:11px;font-weight:600;${bc}">${i.Estado}</span></td>
+      <td style="font-size:11px;color:#666">${i.ComentarioAdmin||''}</td>
+    </tr>`;
+  }).join('');
+
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+<title>GME Solicitudes</title>
+<style>
+  body { font-family: Arial, sans-serif; font-size: 12px; color: #222; margin: 2cm; }
+  h2 { font-size: 16px; color: #0D2B45; margin-bottom: 4px; }
+  p.sub { font-size: 11px; color: #666; margin-bottom: 16px; border-bottom: 2px solid #2EA8D5; padding-bottom: 8px; }
+  table { width: 100%; border-collapse: collapse; }
+  th { background: #0D2B45; color: #fff; padding: 7px 8px; text-align: left; font-size: 11px; }
+  td { padding: 6px 8px; border-bottom: 1px solid #e8e6e0; vertical-align: top; }
+  tr:nth-child(even) td { background: #f8f7f4; }
+  @media print { body { margin: 1cm; } }
+</style></head><body>
+<h2>GME — Reporte de Solicitudes de Ausencia</h2>
+<p class="sub">${subtitle} | Total: ${items.length} registros</p>
+<table>
+  <thead><tr><th>Empleado</th><th>Tipo</th><th>Fechas</th><th>Motivo</th><th>Estado</th><th>Comentario Admin</th></tr></thead>
+  <tbody>${filas}</tbody>
+</table>
+</body></html>`;
+
+  const win = window.open('', '_blank');
+  win.document.write(html);
+  win.document.close();
+  win.focus();
+  setTimeout(() => { win.print(); }, 400);
+}
+
+</script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
 
@@ -38,6 +180,72 @@
     color: var(--text);
     min-height: 100vh;
   }
+
+  /* EXPORT TOOLBAR */
+  .export-bar {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+  .export-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+  }
+  .export-date-input {
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 0.35rem 0.65rem;
+    font-size: 13px;
+    font-family: inherit;
+    color: var(--text);
+    background: var(--bg);
+    cursor: pointer;
+  }
+  .export-date-input:focus { outline: none; border-color: var(--accent); background: #fff; }
+  .export-sep { color: var(--text-muted); font-size: 13px; }
+  .export-divider { width: 1px; height: 24px; background: var(--border); margin: 0 0.25rem; }
+  .btn-export {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.4rem 0.85rem;
+    border-radius: 7px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: #fff;
+    color: var(--text);
+    transition: background 0.15s;
+    white-space: nowrap;
+  }
+  .btn-export:hover { background: var(--bg); }
+  .btn-export.excel { border-color: #1D7044; color: #1D7044; }
+  .btn-export.excel:hover { background: #E8F5EE; }
+  .btn-export.pdf   { border-color: #8B2020; color: #8B2020; }
+  .btn-export.pdf:hover   { background: #FAEAEA; }
+  .btn-export.print { border-color: var(--accent); color: var(--accent); }
+  .btn-export.print:hover { background: var(--accent-light); }
+  @media print {
+    header, .filters, .export-bar, .stats-grid, .action-btns, #btn-refresh { display: none !important; }
+    body { background: #fff; }
+    .table-wrap { box-shadow: none; border: 1px solid #ccc; }
+    .print-header { display: block !important; }
+    th, td { font-size: 11px !important; padding: 6px 8px !important; }
+  }
+  .print-header { display: none; margin-bottom: 1rem; border-bottom: 2px solid #0D2B45; padding-bottom: 0.75rem; }
+  .print-header h2 { font-size: 16px; color: #0D2B45; }
+  .print-header p  { font-size: 12px; color: #666; margin-top: 2px; }
 
   /* HEADER */
   header {
@@ -361,6 +569,24 @@
       <button id="btn-refresh" onclick="cargarSolicitudes()">↻ Actualizar</button>
     </div>
 
+    <!-- EXPORT BAR -->
+    <div class="export-bar">
+      <span class="export-label">&#128197; Período</span>
+      <input type="date" class="export-date-input" id="exp-desde" title="Desde">
+      <span class="export-sep">→</span>
+      <input type="date" class="export-date-input" id="exp-hasta" title="Hasta">
+      <div class="export-divider"></div>
+      <button class="btn-export excel" onclick="exportarExcel()">&#128202; Excel</button>
+      <button class="btn-export pdf"   onclick="exportarPDF()">&#128196; PDF</button>
+      <button class="btn-export print" onclick="imprimirTabla()">&#128438; Imprimir</button>
+    </div>
+
+    <!-- PRINT HEADER (solo visible al imprimir) -->
+    <div class="print-header" id="print-header">
+      <h2>GME — Reporte de Solicitudes de Ausencia</h2>
+      <p id="print-subtitle"></p>
+    </div>
+
     <!-- TABLA -->
     <div class="table-wrap">
       <table>
@@ -392,7 +618,7 @@
       <textarea class="modal-textarea" id="modal-comentario" placeholder="Agrega un comentario para el empleado..."></textarea>
     </div>
     <div class="modal-footer">
-      <button class="btn-modal-cancel" onclick="cerrarModal()">Cerrar</button>
+      <button class="btn-modal-cancel" onclick="cerrarModal()">Cancelar</button>
       <button class="btn-modal-confirm" id="modal-confirm-btn" onclick="confirmarAccion()">Confirmar</button>
     </div>
   </div>
@@ -678,7 +904,11 @@ async function verDetalle(itemId) {
   document.getElementById("modal-comentario-wrap").style.display = "none";
   pendingAction = null;
 
-  document.getElementById("modal-confirm-btn").style.display = "none";
+  const btn = document.getElementById("modal-confirm-btn");
+  btn.textContent = "Cerrar";
+  btn.className = "btn-modal-cancel";
+  btn.onclick = cerrarModal;
+
   document.getElementById("modal").classList.add("open");
 }
 
@@ -686,7 +916,6 @@ function cerrarModal(e) {
   if (e && e.target !== document.getElementById("modal")) return;
   document.getElementById("modal").classList.remove("open");
   document.getElementById("modal-comentario-wrap").style.display = "block";
-  document.getElementById("modal-confirm-btn").style.display = "";
   document.getElementById("modal-confirm-btn").onclick = confirmarAccion;
   pendingAction = null;
 }
