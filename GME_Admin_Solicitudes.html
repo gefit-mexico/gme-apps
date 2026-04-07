@@ -432,14 +432,14 @@
     <div class="export-bar">
       <span class="export-label">&#128197; Período</span>
       <span style="font-size:11px;color:var(--text-muted)">(vacío = todos)</span>
-      <input type="date" class="export-date-input" id="exp-desde" title="Desde">
+      <input type="date" class="export-date-input" id="exp-desde" title="Desde" onchange="renderTabla()">
       <span class="export-sep">→</span>
-      <input type="date" class="export-date-input" id="exp-hasta" title="Hasta">
+      <input type="date" class="export-date-input" id="exp-hasta" title="Hasta" onchange="renderTabla()">
       <div class="export-divider"></div>
       <button class="btn-export excel" onclick="exportarExcel()">&#128202; Excel</button>
       <button class="btn-export pdf"   onclick="exportarPDF()">&#128196; PDF</button>
       <button class="btn-export print" onclick="imprimirTabla()">&#128438; Imprimir</button>
-      <button class="btn-export" onclick="document.getElementById('exp-desde').value='';document.getElementById('exp-hasta').value='';" title="Quitar filtro de fechas">✕ Quitar período</button>
+      <button class="btn-export" onclick="document.getElementById('exp-desde').value='';document.getElementById('exp-hasta').value='';renderTabla();" title="Quitar filtro de fechas">✕ Quitar período</button>
     </div>
 
     <!-- PRINT HEADER (solo visible al imprimir) -->
@@ -637,6 +637,8 @@ function setFiltro(btn) {
 
 function renderTabla() {
   const busqueda = document.getElementById("filter-search").value.toLowerCase();
+  const desde = document.getElementById("exp-desde").value;
+  const hasta  = document.getElementById("exp-hasta").value;
   let items = allItems;
 
   if (filtroEstado !== "Todos") items = items.filter(i => i.Estado === filtroEstado);
@@ -644,6 +646,8 @@ function renderTabla() {
     (i.NombreSolicitante || "").toLowerCase().includes(busqueda) ||
     (i.EmailSolicitante  || "").toLowerCase().includes(busqueda)
   );
+  if (desde) items = items.filter(i => i.FechaInicio >= desde);
+  if (hasta)  items = items.filter(i => i.FechaInicio <= hasta);
 
   const tbody = document.getElementById("tabla-body");
   if (!items.length) {
@@ -882,8 +886,23 @@ function buildPrintSubtitle() {
 function imprimirTabla() {
   const items = getItemsFiltradosPorFecha();
   if (!items.length) { alert('No hay solicitudes en el período seleccionado.'); return; }
-  document.getElementById('print-subtitle').textContent = buildPrintSubtitle();
-  window.print();
+  const subtitle = buildPrintSubtitle();
+  const iconos = { Vacaciones:'Vacaciones', 'Permiso Personal':'Permiso Personal', Incapacidad:'Incapacidad' };
+  const badgeColor = { Pendiente:'color:#7A4F00;background:#FFF4DC', Aprobada:'color:#1D6B45;background:#E8F5EE', Rechazada:'color:#8B2020;background:#FAEAEA' };
+  const filas = items.map(i => {
+    const fechas = i.MedioDia
+      ? 'Medio día — ' + fmtFecha(i.FechaInicio)
+      : i.FechaInicio === i.FechaFin ? fmtFecha(i.FechaInicio)
+      : fmtFecha(i.FechaInicio) + ' → ' + fmtFecha(i.FechaFin);
+    const bc = badgeColor[i.Estado] || 'color:#333;background:#eee';
+    return '<tr><td>' + (i.NombreSolicitante||'—') + '<br><span style="font-size:10px;color:#888">' + (i.EmailSolicitante||'') + '</span></td><td>' + (i.TipoAusencia||'—') + '</td><td style="white-space:nowrap">' + fechas + '</td><td>' + (i.Motivo||'—') + '</td><td><span style="border-radius:20px;padding:2px 8px;font-size:11px;font-weight:600;' + bc + '">' + i.Estado + '</span></td><td style="font-size:11px;color:#666">' + (i.ComentarioAdmin||'') + '</td></tr>';
+  }).join('');
+  const html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>GME Solicitudes — Imprimir</title><style>body{font-family:Arial,sans-serif;font-size:12px;color:#222;margin:1.5cm}h2{font-size:16px;color:#0D2B45;margin-bottom:4px}p.sub{font-size:11px;color:#666;margin-bottom:16px;border-bottom:2px solid #2EA8D5;padding-bottom:8px}table{width:100%;border-collapse:collapse}th{background:#0D2B45;color:#fff;padding:7px 8px;text-align:left;font-size:11px}td{padding:6px 8px;border-bottom:1px solid #e8e6e0;vertical-align:top}tr:nth-child(even) td{background:#f8f7f4}@media print{@page{margin:1cm}}</style></head><body><h2>GME — Reporte de Solicitudes de Ausencia</h2><p class="sub">' + subtitle + ' | Total: ' + items.length + ' registros</p><table><thead><tr><th>Empleado</th><th>Tipo</th><th>Fechas</th><th>Motivo</th><th>Estado</th><th>Comentario Admin</th></tr></thead><tbody>' + filas + '</tbody></table></body></html>';
+  const win = window.open('', '_blank');
+  win.document.write(html);
+  win.document.close();
+  win.focus();
+  setTimeout(function(){ win.print(); }, 400);
 }
 
 function exportarExcel() {
