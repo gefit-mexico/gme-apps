@@ -392,7 +392,7 @@
       <textarea class="modal-textarea" id="modal-comentario" placeholder="Agrega un comentario para el empleado..."></textarea>
     </div>
     <div class="modal-footer">
-      <button class="btn-modal-cancel" onclick="cerrarModal()">Cancelar</button>
+      <button class="btn-modal-cancel" onclick="cerrarModal()">Cerrar</button>
       <button class="btn-modal-confirm" id="modal-confirm-btn" onclick="confirmarAccion()">Confirmar</button>
     </div>
   </div>
@@ -678,11 +678,7 @@ async function verDetalle(itemId) {
   document.getElementById("modal-comentario-wrap").style.display = "none";
   pendingAction = null;
 
-  const btn = document.getElementById("modal-confirm-btn");
-  btn.textContent = "Cerrar";
-  btn.className = "btn-modal-cancel";
-  btn.onclick = cerrarModal;
-
+  document.getElementById("modal-confirm-btn").style.display = "none";
   document.getElementById("modal").classList.add("open");
 }
 
@@ -690,6 +686,7 @@ function cerrarModal(e) {
   if (e && e.target !== document.getElementById("modal")) return;
   document.getElementById("modal").classList.remove("open");
   document.getElementById("modal-comentario-wrap").style.display = "block";
+  document.getElementById("modal-confirm-btn").style.display = "";
   document.getElementById("modal-confirm-btn").onclick = confirmarAccion;
   pendingAction = null;
 }
