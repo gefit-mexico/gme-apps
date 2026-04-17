@@ -514,7 +514,7 @@ const msalApp = new msal.PublicClientApplication({
     authority:   `https://login.microsoftonline.com/${CONFIG.tenantId}`,
     redirectUri: CONFIG.redirectUri
   },
-  cache: { cacheLocation: "sessionStorage" }
+  cache: { cacheLocation: "localStorage", storeAuthStateInCookie: true }
 });
 
 let currentUser = null;
@@ -547,17 +547,28 @@ async function init() {
 }
 
 async function getToken() {
+  // Primo tentativo: token SharePoint
   try {
     const r = await msalApp.acquireTokenSilent({ scopes: SCOPES_SP, account: currentUser });
     accessToken = r.accessToken;
-  } catch {
-    try {
-      const r2 = await msalApp.acquireTokenSilent({ scopes: SCOPES_LOGIN, account: currentUser });
-      accessToken = r2.accessToken;
-    } catch {
-      await msalApp.acquireTokenRedirect({ scopes: SCOPES_SP });
-    }
+    return; // ← OK, uscita
+  } catch (e1) {
+    console.warn("acquireTokenSilent SP fallito:", e1.name);
   }
+  // Secondo tentativo: token login (fallback)
+  try {
+    const r2 = await msalApp.acquireTokenSilent({ scopes: SCOPES_LOGIN, account: currentUser });
+    accessToken = r2.accessToken;
+    return; // ← OK, uscita
+  } catch (e2) {
+    console.warn("acquireTokenSilent Login fallito:", e2.name);
+  }
+  // Fallback finale: redirect (salva lo stato prima)
+  // Su mobile il silent fallisce spesso per restrizioni cookie/storage
+  sessionStorage.setItem("gme_redirect_pending", "1");
+  await msalApp.acquireTokenRedirect({ scopes: SCOPES_SP });
+  // L'esecuzione si ferma qui — la pagina farà reload dopo il redirect
+  throw new Error("REDIRECT_IN_PROGRESS");
 }
 
 function login() {
@@ -960,6 +971,11 @@ async function enviarSolicitud() {
     cargarMisSolicitudes();
   } catch (e) {
     console.error(e);
+    if (e.message === "REDIRECT_IN_PROGRESS") {
+      // Redirect MSAL in corso su mobile — la pagina si ricaricherà automaticamente
+      showAlert("⏳ Redirigiendo para autenticación... la solicitud se enviará al volver.", "warning");
+      return; // non resettare il form, i dati si perderanno col redirect comunque
+    }
     showAlert("Error al enviar la solicitud: " + e.message, "error");
   } finally {
     setBtnLoading(false);
