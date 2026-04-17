@@ -514,7 +514,7 @@ const msalApp = new msal.PublicClientApplication({
     authority:   `https://login.microsoftonline.com/${CONFIG.tenantId}`,
     redirectUri: CONFIG.redirectUri
   },
-  cache: { cacheLocation: "localStorage", storeAuthStateInCookie: true }
+  cache: { cacheLocation: "sessionStorage", storeAuthStateInCookie: true }
 });
 
 let currentUser = null;
@@ -936,13 +936,13 @@ async function enviarSolicitud() {
     Title:              `${tipoSeleccionado} — ${nombre}`,
     NombreSolicitante:  nombre,
     EmailSolicitante:   email,
-    TipoAusencia:       { "__metadata": { "type": "SP.FieldChoiceValue" }, "Value": tipoSeleccionado },
+    TipoAusencia:       tipoSeleccionado,
     FechaInicio:        inicio,
     FechaFin:           fechaFin,
     MedioDia:           medioDia,
     Motivo:             motivo,
     ReferenciaDoc:      docRef,
-    Estado:             { "__metadata": { "type": "SP.FieldChoiceValue" }, "Value": "Pendiente" }
+    Estado:             "Pendiente"
   };
 
   try {
