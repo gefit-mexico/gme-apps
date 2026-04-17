@@ -936,13 +936,13 @@ async function enviarSolicitud() {
     Title:              `${tipoSeleccionado} — ${nombre}`,
     NombreSolicitante:  nombre,
     EmailSolicitante:   email,
-    TipoAusencia:       tipoSeleccionado,
+    TipoAusencia:       { "__metadata": { "type": "SP.FieldChoiceValue" }, "Value": tipoSeleccionado },
     FechaInicio:        inicio,
     FechaFin:           fechaFin,
     MedioDia:           medioDia,
     Motivo:             motivo,
     ReferenciaDoc:      docRef,
-    Estado:             "Pendiente"
+    Estado:             { "__metadata": { "type": "SP.FieldChoiceValue" }, "Value": "Pendiente" }
   };
 
   try {
@@ -1001,8 +1001,11 @@ async function cargarMisSolicitudes() {
       Rechazada:  { cls:"badge-rechazada",  label:"Rechazada" }
     };
     cont.innerHTML = items.map(it => {
-      const f = it; // REST API restituisce campi direttamente
-      const estado = estados[f.Estado] || estados.Pendiente;
+      const f = it;
+      // Choice fields con odata=verbose tornano come oggetti {Value: "..."} o come stringhe
+      const tipoVal  = (f.TipoAusencia && typeof f.TipoAusencia === "object") ? f.TipoAusencia.Value : f.TipoAusencia;
+      const estadoVal = (f.Estado && typeof f.Estado === "object") ? f.Estado.Value : f.Estado;
+      const estado = estados[estadoVal] || estados.Pendiente;
       const fechas = f.MedioDia
         ? `Medio día — ${formatFecha(f.FechaInicio)}`
         : f.FechaInicio === f.FechaFin
@@ -1010,9 +1013,9 @@ async function cargarMisSolicitudes() {
           : `${formatFecha(f.FechaInicio)} → ${formatFecha(f.FechaFin)}`;
       return `
         <div class="solicitud-item">
-          <span class="sol-icon">${iconos[f.TipoAusencia] || "📋"}</span>
+          <span class="sol-icon">${iconos[tipoVal] || "📋"}</span>
           <div class="sol-info">
-            <div class="sol-tipo">${f.TipoAusencia}</div>
+            <div class="sol-tipo">${tipoVal}</div>
             <div class="sol-fechas">${fechas}${f.Motivo ? " · " + f.Motivo.substring(0,40) : ""}</div>
           </div>
           <span class="sol-badge ${estado.cls}">${estado.label}</span>
