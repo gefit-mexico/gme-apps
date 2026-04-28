@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>GME Gestionale Proyectos</title>
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 :root {
   --primary:    #2EA8D5;
@@ -169,6 +170,31 @@ tr:hover td { background:rgba(46,168,213,.03); }
 .stat-card .stat-value { font-size:22px; font-weight:700; color:var(--navy); }
 .stat-card .stat-sub { font-size:11px; color:var(--text-muted); margin-top:4px; }
 .stat-accent { color:var(--primary) !important; }
+
+/* DASHBOARD M4 */
+.dash-grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-top:18px; }
+.dash-grid-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:18px; margin-top:18px; }
+.chart-card { background:#fff; border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); padding:18px; }
+.chart-card h4 { font-size:13px; font-weight:700; color:var(--navy); margin-bottom:14px; display:flex; align-items:center; gap:8px; }
+.chart-wrap { position:relative; }
+.kpi-big { font-size:28px; font-weight:700; }
+.kpi-trend { font-size:12px; margin-top:4px; }
+.kpi-trend.up   { color:var(--success); }
+.kpi-trend.down { color:var(--danger); }
+.proy-row { display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid #f0f2f5; }
+.proy-row:last-child { border-bottom:none; }
+.proy-row .proy-id { font-family:monospace; font-size:12px; font-weight:700; color:var(--primary); min-width:64px; }
+.proy-row .proy-name { font-size:12px; flex:1; color:var(--text); }
+.proy-row .proy-bar-wrap { width:120px; background:var(--border); border-radius:10px; height:7px; }
+.proy-row .proy-bar { height:100%; border-radius:10px; background:var(--primary); }
+.proy-row .proy-pct { font-size:12px; font-weight:600; min-width:38px; text-align:right; }
+.semaforo { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:4px; }
+.sem-green  { background:var(--success); }
+.sem-yellow { background:var(--warning); }
+.sem-red    { background:var(--danger); }
+.cashflow-item { display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #f0f2f5; font-size:13px; }
+.cashflow-item:last-child { border-bottom:none; }
+.stats-row-5 { display:grid; grid-template-columns:repeat(5,1fr); gap:14px; margin-bottom:20px; }
 </style>
 </head>
 <body>
@@ -254,36 +280,108 @@ tr:hover td { background:rgba(46,168,213,.03); }
       <div class="page-header">
         <div class="page-header-left">
           <h1>📊 Dashboard</h1>
-          <p>Resumen ejecutivo — proyectos G9999</p>
+          <p>Resumen ejecutivo — proyectos activos GME</p>
         </div>
+        <button class="btn btn-outline btn-sm" onclick="updateDashboard()">↺ Actualizar</button>
       </div>
-      <div class="stats-row">
+
+      <!-- KPIs row 1 -->
+      <div class="stats-row-5">
         <div class="stat-card">
           <div class="stat-label">Proyectos activos</div>
-          <div class="stat-value stat-accent" id="kpi-proyectos">—</div>
+          <div class="kpi-big stat-accent" id="kpi-proyectos">—</div>
           <div class="stat-sub">En ejecución</div>
         </div>
         <div class="stat-card">
-          <div class="stat-label">Valor contratos</div>
-          <div class="stat-value" id="kpi-valor">—</div>
-          <div class="stat-sub">MXN total</div>
+          <div class="stat-label">Valor contratos (MXN)</div>
+          <div class="kpi-big" id="kpi-valor" style="font-size:18px">—</div>
+          <div class="stat-sub" id="kpi-valor-usd">—</div>
         </div>
         <div class="stat-card">
-          <div class="stat-label">Costo acumulado</div>
-          <div class="stat-value" id="kpi-costo">—</div>
-          <div class="stat-sub">MXN registrado</div>
+          <div class="stat-label">Costo acumulado (MXN)</div>
+          <div class="kpi-big" id="kpi-costo" style="font-size:18px">—</div>
+          <div class="stat-sub" id="kpi-costo-pct">—</div>
         </div>
         <div class="stat-card">
           <div class="stat-label">Margen bruto est.</div>
-          <div class="stat-value" id="kpi-margen">—</div>
-          <div class="stat-sub">Valor - Costo</div>
+          <div class="kpi-big" id="kpi-margen" style="font-size:18px">—</div>
+          <div class="kpi-trend" id="kpi-margen-pct">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Avance ponderado</div>
+          <div class="kpi-big stat-accent" id="kpi-avance">—</div>
+          <div style="background:var(--border);border-radius:10px;height:6px;margin-top:8px;overflow:hidden;">
+            <div id="kpi-avance-bar" style="background:var(--primary);height:100%;border-radius:10px;width:0%;transition:width .5s;"></div>
+          </div>
         </div>
       </div>
-      <div style="text-align:center;padding:60px 20px;color:var(--text-muted);background:#fff;border:1px solid var(--border);border-radius:var(--radius);">
-        <div style="font-size:48px;margin-bottom:14px;">🚧</div>
-        <p style="font-size:15px;font-weight:600;color:var(--navy);">Dashboard con KPIs y gráficas — Módulo 4</p>
-        <p style="font-size:12px;margin-top:6px;">Registra proyectos, POs y movimientos para visualizar datos reales.</p>
+
+      <!-- Row 2: Gráficas principales -->
+      <div class="dash-grid">
+        <!-- Gráfica 1: Valor vs Costo por proyecto -->
+        <div class="chart-card">
+          <h4>📊 Valor vs Costo por proyecto (MXN)</h4>
+          <div class="chart-wrap" style="height:220px">
+            <canvas id="chartValorCosto"></canvas>
+          </div>
+        </div>
+        <!-- Gráfica 2: Distribución costos por tipo -->
+        <div class="chart-card">
+          <h4>🍩 Costos por tipo de movimiento</h4>
+          <div style="display:flex;gap:16px;align-items:center;">
+            <div class="chart-wrap" style="height:200px;width:200px;flex-shrink:0">
+              <canvas id="chartTipoMov"></canvas>
+            </div>
+            <div id="chartTipoMovLegend" style="font-size:11px;line-height:2;"></div>
+          </div>
+        </div>
       </div>
+
+      <!-- Row 3: Avance por proyecto + Cash flow -->
+      <div class="dash-grid" style="margin-top:18px;">
+        <!-- Avance por proyecto -->
+        <div class="chart-card">
+          <h4>🗂️ Avance por proyecto</h4>
+          <div id="dashAvanceProyectos">
+            <div style="text-align:center;padding:30px;color:var(--text-muted);">Sin datos</div>
+          </div>
+        </div>
+        <!-- Cash flow proyectado -->
+        <div class="chart-card">
+          <h4>💰 Cash flow proyectado (POs)</h4>
+          <div id="dashCashflow">
+            <div style="text-align:center;padding:30px;color:var(--text-muted);">Sin datos de POs</div>
+          </div>
+          <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);display:flex;justify-content:space-between;font-size:12px;">
+            <span style="color:var(--text-muted)">Total por cobrar:</span>
+            <strong id="dashTotalPorCobrar">—</strong>
+          </div>
+        </div>
+      </div>
+
+      <!-- Row 4: Alertas de fases + Budget vs Real -->
+      <div class="dash-grid" style="margin-top:18px;">
+        <!-- Alertas -->
+        <div class="chart-card">
+          <h4>🚦 Alertas de presupuesto por fase</h4>
+          <div id="dashAlertas">
+            <div style="text-align:center;padding:30px;color:var(--text-muted);">Sin alertas</div>
+          </div>
+        </div>
+        <!-- Budget vs Real barras -->
+        <div class="chart-card">
+          <h4>📉 Budget vs Costo real por fase</h4>
+          <div class="chart-wrap" style="height:220px">
+            <canvas id="chartBudgetFase"></canvas>
+          </div>
+          <div style="margin-top:8px;">
+            <select id="dashFaseProySelect" style="padding:5px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;outline:none;" onchange="updateChartBudgetFase()">
+              <option value="">— Selecciona proyecto —</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
     </div>
 
     <!-- ── CLIENTES ── -->
@@ -1433,14 +1531,268 @@ function showView(name) {
   if (name==='dashboard')   updateDashboard();
 }
 
+// Chart instances
+let _chartVC=null, _chartTM=null, _chartBF=null;
+
 function updateDashboard() {
-  // Basic KPIs from demo data
-  const activos = S.proyectos.filter(p=>p.Estado==='En ejecución').length;
-  const valor   = S.proyectos.reduce((s,p)=>s+(p.ValorContratoMXN||0),0);
-  document.getElementById('kpi-proyectos').textContent = activos||'—';
-  document.getElementById('kpi-valor').textContent     = valor ? fmtMXN(valor) : '—';
-  document.getElementById('kpi-costo').textContent     = '—';
-  document.getElementById('kpi-margen').textContent    = '—';
+  const fx = JSON.parse(localStorage.getItem('gme_gp_fx')||'{"USD":18.5,"EUR":19.8,"MXN":1}');
+  const activos = S.proyectos.filter(p=>p.Estado==='En ejecución');
+  const total   = S.proyectos.length;
+
+  // ── KPI 1: Proyectos activos
+  document.getElementById('kpi-proyectos').textContent = activos.length||'0';
+
+  // ── KPI 2: Valor contratos MXN
+  // For projects with ValorContratoMXN=0, estimate using FX
+  const valorMXN = S.proyectos.reduce((s,p)=>{
+    if(p.ValorContratoMXN>0) return s+p.ValorContratoMXN;
+    const f = p.MonedaContrato==='USD'?fx.USD:p.MonedaContrato==='EUR'?fx.EUR:1;
+    return s+(p.ValorContratoTotal||0)*f;
+  },0);
+  const valorUSD = S.proyectos.reduce((s,p)=>s+(p.MonedaContrato==='USD'?p.ValorContratoTotal:0),0);
+  document.getElementById('kpi-valor').textContent = valorMXN>0?fmtMXN(valorMXN):'—';
+  document.getElementById('kpi-valor-usd').textContent = valorUSD>0?'USD '+fmtUSD(valorUSD):'';
+
+  // ── KPI 3: Costo acumulado (from all movimientos loaded)
+  const allMov = S.movimientos||[];
+  const costoTotal = allMov.reduce((s,m)=>s+(m.CostoTotalMXN||0),0);
+  const costoPct   = valorMXN>0?(costoTotal/valorMXN*100).toFixed(1)+'% del valor':'';
+  document.getElementById('kpi-costo').textContent     = costoTotal>0?fmtMXN(costoTotal):'$0';
+  document.getElementById('kpi-costo-pct').textContent = costoPct;
+
+  // ── KPI 4: Margen
+  const margen    = valorMXN - costoTotal;
+  const margenPct = valorMXN>0?(margen/valorMXN*100).toFixed(1)+'%':'—';
+  const el = document.getElementById('kpi-margen');
+  const elP= document.getElementById('kpi-margen-pct');
+  el.textContent  = valorMXN>0?fmtMXN(margen):'—';
+  el.style.color  = margen>=0?'var(--success)':'var(--danger)';
+  elP.textContent = margenPct;
+  elP.className   = 'kpi-trend '+(margen>=0?'up':'down');
+
+  // ── KPI 5: Avance ponderado global (promedio simple de proyectos)
+  updateAvanceGlobal();
+
+  // ── Gráficas
+  updateChartValorCosto(fx);
+  updateChartTipoMov();
+  updateDashAvanceProyectos();
+  updateDashCashflow();
+  updateDashAlertas();
+  populateDashFaseSelect();
+}
+
+// ── Avance ponderado global ──────────────────────
+async function updateAvanceGlobal() {
+  // Load fases for all active projects if not already loaded
+  let totalAvance = 0; let count = 0;
+  const proyActivos = S.proyectos.filter(p=>p.Estado==='En ejecución');
+  for (const p of proyActivos) {
+    const key = 'gme_fases_'+p.Title;
+    let fases = [];
+    if (S.spConnected) {
+      try {
+        const d = await spGet(`web/lists/getbytitle('GME_Proyectos_Fases')/items?$top=20&$select=PesoFase,PorcentajeAvance&$filter=ProyectoID eq '${p.Title}'`);
+        fases = d.d.results;
+      } catch(e) { fases = JSON.parse(localStorage.getItem(key)||'[]'); }
+    } else { fases = JSON.parse(localStorage.getItem(key)||'[]'); }
+    if (fases.length) {
+      const av = fases.reduce((s,f)=>s+((f.PesoFase||0)*(f.PorcentajeAvance||0)/100),0);
+      totalAvance += av; count++;
+    }
+  }
+  const avg = count>0?(totalAvance/count).toFixed(1):0;
+  document.getElementById('kpi-avance').textContent = avg+'%';
+  document.getElementById('kpi-avance-bar').style.width = Math.min(avg,100)+'%';
+}
+
+// ── Gráfica 1: Valor vs Costo por proyecto ────────
+function updateChartValorCosto(fx) {
+  const ctx = document.getElementById('chartValorCosto');
+  if (!ctx) return;
+  const labels = S.proyectos.map(p=>p.Title);
+  const valores = S.proyectos.map(p=>{
+    if(p.ValorContratoMXN>0) return p.ValorContratoMXN;
+    const f=p.MonedaContrato==='USD'?fx.USD:p.MonedaContrato==='EUR'?fx.EUR:1;
+    return (p.ValorContratoTotal||0)*f;
+  });
+  // For costs, sum from movimientos by project
+  const costos = S.proyectos.map(p=>
+    S.movimientos.filter(m=>m.ProyectoID===p.Title).reduce((s,m)=>s+(m.CostoTotalMXN||0),0)
+  );
+  if (_chartVC) _chartVC.destroy();
+  _chartVC = new Chart(ctx, {
+    type:'bar',
+    data:{
+      labels,
+      datasets:[
+        {label:'Valor contrato',data:valores,backgroundColor:'rgba(46,168,213,.7)',borderColor:'rgba(46,168,213,1)',borderWidth:1.5},
+        {label:'Costo acumulado',data:costos,backgroundColor:'rgba(245,158,11,.7)',borderColor:'rgba(245,158,11,1)',borderWidth:1.5}
+      ]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{labels:{font:{size:11}}},tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+fmtMXN(ctx.raw)}}},
+      scales:{y:{ticks:{callback:v=>fmtMXN(v),font:{size:10}},grid:{color:'rgba(0,0,0,.05)'}},x:{ticks:{font:{size:11}}}}
+    }
+  });
+}
+
+// ── Gráfica 2: Dona tipos de movimiento ───────────
+function updateChartTipoMov() {
+  const ctx = document.getElementById('chartTipoMov');
+  if (!ctx) return;
+  const COLORS=['#2EA8D5','#f59e0b','#28a745','#0D2B45','#dc3545','#6b7a8d','#17a2b8','#fd7e14','#6f42c1','#20c997','#e83e8c'];
+  const agrupado = {};
+  S.movimientos.forEach(m=>{
+    agrupado[m.TipoMovimiento] = (agrupado[m.TipoMovimiento]||0)+(m.CostoTotalMXN||0);
+  });
+  const tipos  = Object.keys(agrupado).filter(k=>agrupado[k]>0);
+  const totales= tipos.map(k=>agrupado[k]);
+  const total  = totales.reduce((s,v)=>s+v,0);
+  if (!tipos.length) { if(_chartTM){_chartTM.destroy();_chartTM=null;} return; }
+  if (_chartTM) _chartTM.destroy();
+  _chartTM = new Chart(ctx, {
+    type:'doughnut',
+    data:{ labels:tipos, datasets:[{data:totales,backgroundColor:COLORS.slice(0,tipos.length),borderWidth:2}] },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>ctx.label+': '+fmtMXN(ctx.raw)+' ('+((ctx.raw/total)*100).toFixed(1)+'%)'}}}
+    }
+  });
+  // Custom legend
+  const leg = document.getElementById('chartTipoMovLegend');
+  if(leg) leg.innerHTML = tipos.map((t,i)=>
+    `<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+      <span style="width:10px;height:10px;border-radius:2px;background:${COLORS[i]};flex-shrink:0;display:inline-block"></span>
+      <span>${t}: <strong>${fmtMXN(totales[i])}</strong></span>
+    </div>`).join('');
+}
+
+// ── Avance por proyecto (barras inline) ───────────
+function updateDashAvanceProyectos() {
+  const el = document.getElementById('dashAvanceProyectos');
+  if (!el) return;
+  const activos = S.proyectos.filter(p=>p.Estado==='En ejecución');
+  if (!activos.length) { el.innerHTML='<div style="text-align:center;padding:30px;color:var(--text-muted);">Sin proyectos activos</div>'; return; }
+  el.innerHTML = activos.map(p=>{
+    const fx = JSON.parse(localStorage.getItem('gme_gp_fx')||'{"USD":18.5,"EUR":19.8,"MXN":1}');
+    const fases = JSON.parse(localStorage.getItem('gme_fases_'+p.Title)||'[]');
+    const avance = fases.length ? fases.reduce((s,f)=>s+((f.PesoFase||0)*(f.PorcentajeAvance||0)/100),0).toFixed(1) : 0;
+    const costoP = S.movimientos.filter(m=>m.ProyectoID===p.Title).reduce((s,m)=>s+(m.CostoTotalMXN||0),0);
+    const valorP = p.ValorContratoMXN>0?p.ValorContratoMXN:(p.ValorContratoTotal||0)*(p.MonedaContrato==='USD'?fx.USD:p.MonedaContrato==='EUR'?fx.EUR:1);
+    const margenP= valorP>0?((valorP-costoP)/valorP*100).toFixed(1):null;
+    const semColor= avance>=75?'sem-green':avance>=40?'sem-yellow':'sem-red';
+    return `<div class="proy-row">
+      <span class="proy-id">${esc(p.Title)}</span>
+      <span class="proy-name">${esc(p.Nombre)}</span>
+      <div class="proy-bar-wrap"><div class="proy-bar" style="width:${Math.min(avance,100)}%"></div></div>
+      <span class="proy-pct"><span class="semaforo ${semColor}"></span>${avance}%</span>
+      ${margenP!==null?`<span style="font-size:11px;color:${parseFloat(margenP)>=0?'var(--success)':'var(--danger)'};min-width:52px;text-align:right">${margenP}%M</span>`:''}
+    </div>`;
+  }).join('');
+}
+
+// ── Cash flow proyectado ─────────────────────────
+function updateDashCashflow() {
+  const el = document.getElementById('dashCashflow');
+  if (!el) return;
+  if (!S.pos.length) { el.innerHTML='<div style="text-align:center;padding:30px;color:var(--text-muted);">Carga los POs primero</div>'; return; }
+  const fx = JSON.parse(localStorage.getItem('gme_gp_fx')||'{"USD":18.5,"EUR":19.8,"MXN":1}');
+
+  // Build cash flow entries from POs (50/40/10 split)
+  const entries = [];
+  S.pos.forEach(po=>{
+    if(!po.FechaEntregaPO) return;
+    const fBase = po.Moneda==='USD'?fx.USD:po.Moneda==='EUR'?fx.EUR:1;
+    const val   = po.ValorPO*fBase;
+    const d     = new Date(po.FechaEntregaPO+'T12:00:00');
+    const d1    = new Date(d); d1.setDate(d1.getDate()+30);
+    const d2    = new Date(d); d2.setDate(d2.getDate()+60);
+    const d3    = new Date(d); d3.setDate(d3.getDate()+90);
+    entries.push({label:`${po.Title} 50% (entrega)`, fecha:d,  monto:val*0.5, po:po.Title, pct:'50%'});
+    entries.push({label:`${po.Title} 40% (instalac.)`,fecha:d1, monto:val*0.4, po:po.Title, pct:'40%'});
+    entries.push({label:`${po.Title} 10% (acepta.)`,  fecha:d2, monto:val*0.1, po:po.Title, pct:'10%'});
+  });
+  entries.sort((a,b)=>a.fecha-b.fecha);
+  const totalPorCobrar = entries.reduce((s,e)=>s+e.monto,0) - S.pos.reduce((s,p)=>{
+    const f=p.Moneda==='USD'?fx.USD:p.Moneda==='EUR'?fx.EUR:1;
+    return s+(p.MontoCobrado||0)*f;
+  },0);
+
+  el.innerHTML = entries.map(e=>
+    `<div class="cashflow-item">
+      <div>
+        <div style="font-size:12px;font-weight:600">${esc(e.po)} <span style="color:var(--text-muted);font-weight:400">${e.pct}</span></div>
+        <div style="font-size:11px;color:var(--text-muted)">${fmtDate(e.fecha.toISOString().substring(0,10))}</div>
+      </div>
+      <strong style="color:var(--success)">${fmtMXN(e.monto)}</strong>
+    </div>`).join('');
+
+  document.getElementById('dashTotalPorCobrar').textContent = fmtMXN(Math.max(totalPorCobrar,0));
+}
+
+// ── Alertas de presupuesto ────────────────────────
+function updateDashAlertas() {
+  const el = document.getElementById('dashAlertas');
+  if (!el) return;
+  const alertas = [];
+  S.proyectos.forEach(p=>{
+    const fases = JSON.parse(localStorage.getItem('gme_fases_'+p.Title)||'[]');
+    fases.forEach(f=>{
+      if(!f.BudgetFase||f.BudgetFase<=0) return;
+      const costoFase = S.movimientos.filter(m=>m.ProyectoID===p.Title&&m.FaseTipo===f.FaseTipo).reduce((s,m)=>s+(m.CostoTotalMXN||0),0);
+      const pct = costoFase/f.BudgetFase;
+      if(pct>=0.7) alertas.push({proyId:p.Title,fase:f.FaseTipo,pct,costoFase,budget:f.BudgetFase});
+    });
+  });
+  alertas.sort((a,b)=>b.pct-a.pct);
+  if(!alertas.length){el.innerHTML='<div style="text-align:center;padding:30px;color:var(--success);"><div style="font-size:24px">✅</div><p style="margin-top:8px;font-size:13px;">Sin alertas de presupuesto</p></div>';return;}
+  el.innerHTML = alertas.map(a=>{
+    const color = a.pct>=1?'var(--danger)':a.pct>=0.9?'var(--warning)':'var(--warning)';
+    const icon  = a.pct>=1?'🔴':a.pct>=0.9?'🟠':'🟡';
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f0f2f5;font-size:12px;">
+      <div>${icon} <strong>${esc(a.proyId)}</strong> — ${esc(a.fase)}</div>
+      <div style="text-align:right">
+        <div style="font-weight:700;color:${color}">${(a.pct*100).toFixed(0)}%</div>
+        <div style="color:var(--text-muted)">${fmtMXN(a.costoFase)} / ${fmtMXN(a.budget)}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── Gráfica Budget vs Real por fase ───────────────
+function populateDashFaseSelect() {
+  const sel = document.getElementById('dashFaseProySelect');
+  if(!sel) return;
+  const cur = sel.value;
+  sel.innerHTML='<option value="">— Selecciona proyecto —</option>';
+  S.proyectos.forEach(p=>{ sel.innerHTML+=`<option value="${esc(p.Title)}"${p.Title===cur?' selected':''}>${esc(p.Title)}</option>`; });
+  if(cur) updateChartBudgetFase();
+  else if(S.proyectos.length) { sel.value=S.proyectos[0].Title; updateChartBudgetFase(); }
+}
+
+function updateChartBudgetFase() {
+  const proyId = document.getElementById('dashFaseProySelect')?.value;
+  const ctx    = document.getElementById('chartBudgetFase');
+  if(!ctx||!proyId) return;
+  const fases  = JSON.parse(localStorage.getItem('gme_fases_'+proyId)||'[]');
+  const labels = fases.map(f=>f.FaseTipo);
+  const budget = fases.map(f=>f.BudgetFase||0);
+  const real   = fases.map(f=> S.movimientos.filter(m=>m.ProyectoID===proyId&&m.FaseTipo===f.FaseTipo).reduce((s,m)=>s+(m.CostoTotalMXN||0),0));
+  if(_chartBF) _chartBF.destroy();
+  _chartBF = new Chart(ctx,{
+    type:'bar',
+    data:{labels,datasets:[
+      {label:'Budget',data:budget,backgroundColor:'rgba(46,168,213,.5)',borderColor:'rgba(46,168,213,1)',borderWidth:1.5},
+      {label:'Real',  data:real,  backgroundColor:'rgba(245,158,11,.6)',borderColor:'rgba(245,158,11,1)',borderWidth:1.5}
+    ]},
+    options:{
+      responsive:true,maintainAspectRatio:false,indexAxis:'y',
+      plugins:{legend:{labels:{font:{size:11}}},tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+fmtMXN(ctx.raw)}}},
+      scales:{x:{ticks:{callback:v=>fmtMXN(v),font:{size:9}},grid:{color:'rgba(0,0,0,.04)'}},y:{ticks:{font:{size:10}}}}
+    }
+  });
 }
 
 // ══════════════════════════════════════════
@@ -2148,7 +2500,7 @@ function showApp() {
   document.getElementById('app').style.display = 'block';
   updateMsalBadge();
   loadClientes();
-  loadProyectos();
+  loadProyectos().then(()=>{ updateDashboard(); });;
 }
 
 initApp();
