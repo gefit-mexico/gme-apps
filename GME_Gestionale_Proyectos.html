@@ -1144,6 +1144,7 @@ const S = {
   editMovId: null,
   fases: [],
   movimientos: [],
+  allMovimientos: [],
   nextLocalId: 200,
 };
 
@@ -1534,7 +1535,57 @@ function showView(name) {
 // Chart instances
 let _chartVC=null, _chartTM=null, _chartBF=null;
 
-function updateDashboard() {
+async function loadAllMovimientos() {
+  // Load movimientos for ALL active projects for dashboard KPIs
+  if (!S.proyectos.length) return;
+  const all = [];
+  for (const p of S.proyectos) {
+    if (S.spConnected) {
+      try {
+        const d = await spGet(
+          `web/lists/getbytitle('GME_Proyectos_Movimientos')/items?$top=500` +
+          `&$select=ID,ProyectoID,TipoMovimiento,FaseTipo,CostoTotalMXN,HorasCantidad,Moneda` +
+          `&$filter=ProyectoID eq '${p.Title}'`
+        );
+        d.d.results.forEach(r => all.push({
+          id:r.ID, ProyectoID:r.ProyectoID||'', TipoMovimiento:r.TipoMovimiento||'',
+          FaseTipo:r.FaseTipo||'', CostoTotalMXN:r.CostoTotalMXN||0,
+          HorasCantidad:r.HorasCantidad||0, Moneda:r.Moneda||'MXN'
+        }));
+      } catch(e) {
+        // fallback to localStorage
+        const local = JSON.parse(localStorage.getItem('gme_mov_'+p.Title)||'[]');
+        local.forEach(m => all.push(m));
+      }
+    } else {
+      const local = JSON.parse(localStorage.getItem('gme_mov_'+p.Title)||'[]');
+      local.forEach(m => all.push(m));
+    }
+  }
+  S.allMovimientos = all;
+}
+
+async function updateDashboard() {
+  // Load POs if not loaded
+  if (!S.pos.length) {
+    try {
+      const d = await spGet(
+        "web/lists/getbytitle('GME_Proyectos_POs')/items?$top=200" +
+        "&$select=ID,Title,ProyectoID,ValorPO,Moneda,FechaEntregaPO,EstadoFacturacion,MontoFacturado,MontoCobrado"
+      );
+      S.pos = d.d.results.map(r=>({
+        id:r.ID, Title:r.Title||'', ProyectoID:r.ProyectoID||'',
+        ValorPO:r.ValorPO||0, Moneda:r.Moneda||'USD',
+        FechaEntregaPO:r.FechaEntregaPO?r.FechaEntregaPO.substring(0,10):'',
+        EstadoFacturacion:r.EstadoFacturacion||'Pendiente',
+        MontoFacturado:r.MontoFacturado||0, MontoCobrado:r.MontoCobrado||0
+      }));
+    } catch(e) {
+      S.pos = JSON.parse(localStorage.getItem('gme_gp_pos_local')||'[]');
+    }
+  }
+  // Load ALL movimientos for all projects
+  await loadAllMovimientos();
   const fx = JSON.parse(localStorage.getItem('gme_gp_fx')||'{"USD":18.5,"EUR":19.8,"MXN":1}');
   const activos = S.proyectos.filter(p=>p.Estado==='En ejecución');
   const total   = S.proyectos.length;
@@ -1554,7 +1605,7 @@ function updateDashboard() {
   document.getElementById('kpi-valor-usd').textContent = valorUSD>0?'USD '+fmtUSD(valorUSD):'';
 
   // ── KPI 3: Costo acumulado (from all movimientos loaded)
-  const allMov = S.movimientos||[];
+  const allMov = S.allMovimientos||[];
   const costoTotal = allMov.reduce((s,m)=>s+(m.CostoTotalMXN||0),0);
   const costoPct   = valorMXN>0?(costoTotal/valorMXN*100).toFixed(1)+'% del valor':'';
   document.getElementById('kpi-costo').textContent     = costoTotal>0?fmtMXN(costoTotal):'$0';
@@ -1618,7 +1669,7 @@ function updateChartValorCosto(fx) {
   });
   // For costs, sum from movimientos by project
   const costos = S.proyectos.map(p=>
-    S.movimientos.filter(m=>m.ProyectoID===p.Title).reduce((s,m)=>s+(m.CostoTotalMXN||0),0)
+    (S.allMovimientos||[]).filter(m=>m.ProyectoID===p.Title).reduce((s,m)=>s+(m.CostoTotalMXN||0),0)
   );
   if (_chartVC) _chartVC.destroy();
   _chartVC = new Chart(ctx, {
@@ -1644,7 +1695,7 @@ function updateChartTipoMov() {
   if (!ctx) return;
   const COLORS=['#2EA8D5','#f59e0b','#28a745','#0D2B45','#dc3545','#6b7a8d','#17a2b8','#fd7e14','#6f42c1','#20c997','#e83e8c'];
   const agrupado = {};
-  S.movimientos.forEach(m=>{
+  (S.allMovimientos||[]).forEach(m=>{
     agrupado[m.TipoMovimiento] = (agrupado[m.TipoMovimiento]||0)+(m.CostoTotalMXN||0);
   });
   const tipos  = Object.keys(agrupado).filter(k=>agrupado[k]>0);
@@ -1679,7 +1730,7 @@ function updateDashAvanceProyectos() {
     const fx = JSON.parse(localStorage.getItem('gme_gp_fx')||'{"USD":18.5,"EUR":19.8,"MXN":1}');
     const fases = JSON.parse(localStorage.getItem('gme_fases_'+p.Title)||'[]');
     const avance = fases.length ? fases.reduce((s,f)=>s+((f.PesoFase||0)*(f.PorcentajeAvance||0)/100),0).toFixed(1) : 0;
-    const costoP = S.movimientos.filter(m=>m.ProyectoID===p.Title).reduce((s,m)=>s+(m.CostoTotalMXN||0),0);
+    const costoP = (S.allMovimientos||[]).filter(m=>m.ProyectoID===p.Title).reduce((s,m)=>s+(m.CostoTotalMXN||0),0);
     const valorP = p.ValorContratoMXN>0?p.ValorContratoMXN:(p.ValorContratoTotal||0)*(p.MonedaContrato==='USD'?fx.USD:p.MonedaContrato==='EUR'?fx.EUR:1);
     const margenP= valorP>0?((valorP-costoP)/valorP*100).toFixed(1):null;
     const semColor= avance>=75?'sem-green':avance>=40?'sem-yellow':'sem-red';
@@ -1741,7 +1792,7 @@ function updateDashAlertas() {
     const fases = JSON.parse(localStorage.getItem('gme_fases_'+p.Title)||'[]');
     fases.forEach(f=>{
       if(!f.BudgetFase||f.BudgetFase<=0) return;
-      const costoFase = S.movimientos.filter(m=>m.ProyectoID===p.Title&&m.FaseTipo===f.FaseTipo).reduce((s,m)=>s+(m.CostoTotalMXN||0),0);
+      const costoFase = (S.allMovimientos||[]).filter(m=>m.ProyectoID===p.Title&&m.FaseTipo===f.FaseTipo).reduce((s,m)=>s+(m.CostoTotalMXN||0),0);
       const pct = costoFase/f.BudgetFase;
       if(pct>=0.7) alertas.push({proyId:p.Title,fase:f.FaseTipo,pct,costoFase,budget:f.BudgetFase});
     });
@@ -1779,7 +1830,7 @@ function updateChartBudgetFase() {
   const fases  = JSON.parse(localStorage.getItem('gme_fases_'+proyId)||'[]');
   const labels = fases.map(f=>f.FaseTipo);
   const budget = fases.map(f=>f.BudgetFase||0);
-  const real   = fases.map(f=> S.movimientos.filter(m=>m.ProyectoID===proyId&&m.FaseTipo===f.FaseTipo).reduce((s,m)=>s+(m.CostoTotalMXN||0),0));
+  const real   = fases.map(f=> (S.allMovimientos||[]).filter(m=>m.ProyectoID===proyId&&m.FaseTipo===f.FaseTipo).reduce((s,m)=>s+(m.CostoTotalMXN||0),0));
   if(_chartBF) _chartBF.destroy();
   _chartBF = new Chart(ctx,{
     type:'bar',
@@ -2500,7 +2551,7 @@ function showApp() {
   document.getElementById('app').style.display = 'block';
   updateMsalBadge();
   loadClientes();
-  loadProyectos().then(()=>{ updateDashboard(); });;
+  loadProyectos().then(async ()=>{ await updateDashboard(); });;
 }
 
 initApp();
